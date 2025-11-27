@@ -27,3 +27,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Cache
+sprints_cache.json

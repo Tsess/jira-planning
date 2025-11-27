@@ -88,6 +88,55 @@
             animation: slideDown 0.8s ease-out 0.4s both;
         }
 
+        .sprint-selector {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .sprint-selector label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0;
+        }
+
+        .sprint-selector button {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            margin: 0;
+        }
+
+        select {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(212, 56, 13, 0.1);
+        }
+
+        select:hover {
+            border-color: var(--text-secondary);
+        }
+
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .config-panel {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
@@ -576,7 +625,15 @@
 
         // Backend server URL
         const BACKEND_URL = 'http://localhost:5000';
-        const JIRA_URL = 'https://criteo.atlassian.net';
+
+        // Get current quarter in format "2025Q1"
+        function getCurrentQuarter() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1; // 1-12
+            const quarter = Math.ceil(month / 3);
+            return `${year}Q${quarter}`;
+        }
 
         function App() {
             const [tasks, setTasks] = useState([]);
@@ -588,11 +645,82 @@
             const [showProduct, setShowProduct] = useState(true);
             const [sprintName, setSprintName] = useState('Sprint');
             const [statusFilter, setStatusFilter] = useState(null); // null = show all, 'in-progress', 'todo-accepted', 'done', 'high-priority'
+            const [selectedSprint, setSelectedSprint] = useState(null); // Sprint ID
+            const [availableSprints, setAvailableSprints] = useState([]);
+            const [sprintsLoading, setSprintsLoading] = useState(true);
+            const [jiraUrl, setJiraUrl] = useState('');
 
             useEffect(() => {
-                // Automatically load tasks on mount
-                fetchTasks();
+                // Load config and sprints on component mount
+                loadConfig();
+                loadSprints();
             }, []);
+
+            const loadConfig = async () => {
+                try {
+                    const response = await fetch(`${BACKEND_URL}/api/config`);
+                    if (response.ok) {
+                        const config = await response.json();
+                        setJiraUrl(config.jiraUrl || '');
+                    }
+                } catch (err) {
+                    console.error('Failed to load config:', err);
+                }
+            };
+
+            useEffect(() => {
+                // Load tasks when sprint changes (only if sprint is selected)
+                if (selectedSprint !== null) {
+                    fetchTasks();
+                }
+            }, [selectedSprint]);
+
+            const loadSprints = async (forceRefresh = false) => {
+                setSprintsLoading(true);
+                try {
+                    const params = new URLSearchParams({
+                        t: Date.now().toString()
+                    });
+                    if (forceRefresh) {
+                        params.append('refresh', 'true');
+                    }
+                    const response = await fetch(`${BACKEND_URL}/api/sprints?${params}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        cache: 'no-cache'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const sprints = data.sprints || [];
+                    setAvailableSprints(sprints);
+
+                    // Auto-select current quarter if available
+                    const currentQuarter = getCurrentQuarter();
+                    const currentSprint = sprints.find(s => s.name === currentQuarter);
+                    if (currentSprint) {
+                        setSelectedSprint(currentSprint.id);
+                        setSprintName(currentSprint.name);
+                    } else if (sprints.length > 0) {
+                        // If current quarter not found, select the last sprint
+                        const lastSprint = sprints[sprints.length - 1];
+                        setSelectedSprint(lastSprint.id);
+                        setSprintName(lastSprint.name);
+                    }
+
+                    console.log('✅ Loaded sprints:', sprints);
+                } catch (err) {
+                    console.error('Failed to load sprints:', err);
+                    setError(`Failed to load sprints: ${err.message}`);
+                } finally {
+                    setSprintsLoading(false);
+                }
+            };
 
             const priorityOrder = {
                 'Blocker': 1,
@@ -612,9 +740,12 @@
                 setError('');
 
                 try {
-                    // Add cache busting parameter to prevent browser caching
-                    const cacheBuster = `?t=${Date.now()}`;
-                    const response = await fetch(`${BACKEND_URL}/api/tasks${cacheBuster}`, {
+                    // Add cache busting parameter and sprint parameter
+                    const params = new URLSearchParams({
+                        t: Date.now().toString(),
+                        sprint: selectedSprint
+                    });
+                    const response = await fetch(`${BACKEND_URL}/api/tasks?${params}`, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json',
@@ -635,15 +766,6 @@
 
                     const data = await response.json();
                     console.log('Success! Received data:', data);
-
-                    // Extract sprint name from first task
-                    if (data.issues && data.issues.length > 0) {
-                        const firstTask = data.issues[0];
-                        const sprint = firstTask.fields.customfield_10101;
-                        if (sprint && sprint.length > 0) {
-                            setSprintName(sprint[0].name);
-                        }
-                    }
 
                     // Sort by priority
                     const sortedTasks = data.issues.sort((a, b) => {
@@ -732,6 +854,41 @@
                     <header>
                         <h1>Sprint Tasks</h1>
                         <p className="subtitle">Product & Tech Team · {sprintName}</p>
+                        <div className="sprint-selector">
+                            <label>Select Sprint:</label>
+                            <select
+                                value={selectedSprint || ''}
+                                onChange={(e) => {
+                                    const sprintId = parseInt(e.target.value);
+                                    setSelectedSprint(sprintId);
+                                    const sprint = availableSprints.find(s => s.id === sprintId);
+                                    if (sprint) {
+                                        setSprintName(sprint.name);
+                                    }
+                                }}
+                                disabled={sprintsLoading || availableSprints.length === 0}
+                            >
+                                {sprintsLoading ? (
+                                    <option value="">Loading sprints...</option>
+                                ) : availableSprints.length === 0 ? (
+                                    <option value="">No sprints available</option>
+                                ) : (
+                                    availableSprints.map(sprint => (
+                                        <option key={sprint.id} value={sprint.id}>
+                                            {sprint.name} ({sprint.state})
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                            <button
+                                className="secondary"
+                                onClick={() => loadSprints(true)}
+                                disabled={sprintsLoading}
+                                title="Refresh sprints list from Jira"
+                            >
+                                {sprintsLoading ? 'Loading...' : 'Refresh Sprints'}
+                            </button>
+                        </div>
                     </header>
 
                     {loading ? (
@@ -854,7 +1011,7 @@
                                                     </span>
                                                 </div>
                                                 <h3 className="task-title">
-                                                    <a href={`${JIRA_URL}/browse/${task.key}`} target="_blank" rel="noopener noreferrer">
+                                                    <a href={`${jiraUrl}/browse/${task.key}`} target="_blank" rel="noopener noreferrer">
                                                         {task.fields.summary}
                                                     </a>
                                                 </h3>
