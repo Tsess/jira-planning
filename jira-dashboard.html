@@ -94,6 +94,7 @@
             gap: 1rem;
             margin-top: 1rem;
             flex-wrap: wrap;
+            position: relative;
         }
 
         .sprint-selector label {
@@ -615,6 +616,168 @@
             font-weight: 300;
             margin-bottom: 1rem;
         }
+
+        /* Sprint Planning Styles */
+        .planning-button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: absolute;
+            right: 0;
+        }
+
+        .planning-button:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transform: none;
+        }
+
+        .planning-button.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .planning-button svg {
+            width: 0.75rem;
+            height: 0.75rem;
+            transition: transform 0.3s;
+        }
+
+        .planning-button.active svg {
+            transform: rotate(180deg);
+        }
+
+        .planning-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            animation: expandDown 0.6s ease-out;
+            overflow: hidden;
+        }
+
+        @keyframes expandDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 200px;
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+            }
+        }
+
+        .planning-stats {
+            display: flex;
+            gap: 3rem;
+            align-items: center;
+            justify-content: center;
+            font-family: 'IBM Plex Mono', monospace;
+            flex-wrap: wrap;
+        }
+
+        .uncheck-button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 0.4rem 1rem;
+            font-size: 0.7rem;
+            margin: 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .uncheck-button:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            transform: none;
+        }
+
+        .uncheck-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .uncheck-button:disabled:hover {
+            background: transparent;
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+
+        .planning-stat {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        .planning-stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .planning-stat-value {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #d48806;
+            line-height: 1;
+        }
+
+        .task-checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .task-checkbox {
+            width: 0.75rem;
+            height: 0.75rem;
+            min-width: 0.75rem;
+            min-height: 0.75rem;
+            cursor: pointer;
+            appearance: none;
+            border: 1.5px solid var(--border);
+            border-radius: 2px;
+            background: var(--bg-secondary);
+            transition: all 0.2s;
+            position: relative;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .task-checkbox:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .task-checkbox:checked {
+            background: #52c41a;
+            border-color: #52c41a;
+        }
+
+        .task-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 0.55rem;
+            font-weight: bold;
+            line-height: 1;
+        }
     </style>
 </head>
 <body>
@@ -635,6 +798,30 @@
             return `${year}Q${quarter}`;
         }
 
+        // Cookie helper functions
+        function setCookie(name, value, days = 365) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+            document.cookie = `${name}=${JSON.stringify(value)};expires=${expires.toUTCString()};path=/`;
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) {
+                    try {
+                        return JSON.parse(c.substring(nameEQ.length, c.length));
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+
         function App() {
             const [tasks, setTasks] = useState([]);
             const [loading, setLoading] = useState(false);
@@ -649,12 +836,22 @@
             const [availableSprints, setAvailableSprints] = useState([]);
             const [sprintsLoading, setSprintsLoading] = useState(true);
             const [jiraUrl, setJiraUrl] = useState('');
+            const [selectedTasks, setSelectedTasks] = useState(() => {
+                // Load from cookie on init
+                return getCookie('selectedTasks') || {};
+            });
+            const [showPlanning, setShowPlanning] = useState(false);
 
             useEffect(() => {
                 // Load config and sprints on component mount
                 loadConfig();
                 loadSprints();
             }, []);
+
+            useEffect(() => {
+                // Save selected tasks to cookie whenever they change
+                setCookie('selectedTasks', selectedTasks);
+            }, [selectedTasks]);
 
             const loadConfig = async () => {
                 try {
@@ -849,6 +1046,41 @@
                 setTasks(tasks.filter(t => t.key !== taskKey));
             };
 
+            const toggleTaskSelection = (taskKey) => {
+                setSelectedTasks(prev => {
+                    const newSelected = { ...prev };
+                    if (newSelected[taskKey]) {
+                        delete newSelected[taskKey];
+                    } else {
+                        newSelected[taskKey] = true;
+                    }
+                    return newSelected;
+                });
+            };
+
+            const clearSelectedTasks = () => {
+                setSelectedTasks({});
+            };
+
+            // Calculate sum of Story Points for selected tasks
+            const calculateSelectedSP = () => {
+                let sum = 0;
+                visibleTasks.forEach(task => {
+                    if (selectedTasks[task.key]) {
+                        const sp = task.fields.customfield_10004;
+                        if (sp) {
+                            sum += parseFloat(sp);
+                        }
+                    }
+                });
+                return sum;
+            };
+
+            const selectedSP = calculateSelectedSP();
+            const selectedCount = Object.keys(selectedTasks).filter(key =>
+                visibleTasks.some(task => task.key === key)
+            ).length;
+
             return (
                 <div className="container">
                     <header>
@@ -888,7 +1120,39 @@
                             >
                                 {sprintsLoading ? 'Loading...' : 'Refresh Sprints'}
                             </button>
+                            <button
+                                className={`planning-button ${showPlanning ? 'active' : ''}`}
+                                onClick={() => setShowPlanning(!showPlanning)}
+                                title="Toggle sprint planning panel"
+                            >
+                                Sprint Planning
+                                <svg viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 9L1 4h10z"/>
+                                </svg>
+                            </button>
                         </div>
+                        {showPlanning && (
+                            <div className="planning-panel">
+                                <div className="planning-stats">
+                                    <div className="planning-stat">
+                                        <span className="planning-stat-label">Selected Tasks:</span>
+                                        <span className="planning-stat-value">{selectedCount}</span>
+                                    </div>
+                                    <div className="planning-stat">
+                                        <span className="planning-stat-label">Sum SP:</span>
+                                        <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
+                                    </div>
+                                    <button
+                                        className="uncheck-button"
+                                        onClick={clearSelectedTasks}
+                                        disabled={selectedCount === 0}
+                                        title="Clear all selected tasks"
+                                    >
+                                        Uncheck Selected
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </header>
 
                     {loading ? (
@@ -998,14 +1262,25 @@
                                                     >
                                                         ×
                                                     </button>
-                                                    <span className="task-key">
-                                                        {task.key}
-                                                        {task.fields.customfield_10004 && (
-                                                            <span className="task-story-points-small">
-                                                                {task.fields.customfield_10004} SP
-                                                            </span>
+                                                    <div className="task-checkbox-container">
+                                                        <span className="task-key">
+                                                            {task.key}
+                                                            {task.fields.customfield_10004 && (
+                                                                <span className="task-story-points-small">
+                                                                    {task.fields.customfield_10004} SP
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        {showPlanning && (
+                                                            <input
+                                                                type="checkbox"
+                                                                className="task-checkbox"
+                                                                checked={!!selectedTasks[task.key]}
+                                                                onChange={() => toggleTaskSelection(task.key)}
+                                                                title="Select for sprint planning"
+                                                            />
                                                         )}
-                                                    </span>
+                                                    </div>
                                                     <span className={`task-priority ${task.fields.priority?.name.toLowerCase()}`}>
                                                         {task.fields.priority?.name || 'None'}
                                                     </span>
