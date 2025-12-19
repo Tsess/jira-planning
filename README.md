@@ -34,7 +34,7 @@ If you just want to see the dashboard working locally:
 2. Copy the env template: `cp .env.example .env`
 3. Edit `.env` and set **JIRA_URL**, **JIRA_EMAIL**, **JIRA_TOKEN**, and **JQL_QUERY** (leave the sample JQL if it already fits your projects/teams).
 4. Start the backend: `python3 jira_server.py`
-5. Visit `http://localhost:5050/api/test` in your browser to confirm connectivity.
+5. Visit `http://localhost:5000/api/test` in your browser to confirm connectivity.
 6. Open `jira-dashboard.html` in your browser to view the UI. Tasks should load automatically using your JQL and sprint selection.
 
 More detailed setup guidance remains below if you need it.
@@ -140,7 +140,7 @@ You should see:
 ✅ Server ready! Open jira-dashboard.html in your browser
 ```
 
-`<PORT>` will be `5050` by default, or whatever you set via `SERVER_PORT` in `.env` or the `--server_port` flag.
+`<PORT>` will be `5000` by default, or whatever you set via `SERVER_PORT` in `.env` or the `--server_port` flag.
 
 ### Step 5: Open the dashboard
 
@@ -149,7 +149,7 @@ Open `jira-dashboard.html` in your browser. Tasks will load automatically!
 ## 🔧 How it works
 
 1. **Backend** (`jira_server.py`):
-   - Runs on `localhost:5050` by default (overridable via `SERVER_PORT` or `--server_port`)
+   - Runs on `localhost:5000` by default (overridable via `SERVER_PORT` or `--server_port`)
    - Reads credentials from `.env` file
    - Makes secure READ-ONLY API requests to Jira
    - Caches sprint list for 24 hours (reduces API load)

@@ -26,7 +26,7 @@ JIRA_EMAIL = os.getenv('JIRA_EMAIL')
 JIRA_TOKEN = os.getenv('JIRA_TOKEN')
 JQL_QUERY = os.getenv('JQL_QUERY', 'project IN (PRODUCT, TECH) ORDER BY created DESC')
 JIRA_BOARD_ID = os.getenv('JIRA_BOARD_ID')  # Optional: board ID for faster sprint fetching
-SERVER_PORT = int(os.getenv('SERVER_PORT', '5050'))
+SERVER_PORT = int(os.getenv('SERVER_PORT', '5000'))
 
 # Cache settings
 SPRINTS_CACHE_FILE = 'sprints_cache.json'
@@ -35,7 +35,7 @@ CACHE_EXPIRY_HOURS = 24
 def parse_args():
     """Parse CLI arguments to optionally override environment variables."""
     parser = argparse.ArgumentParser(description='Jira proxy server')
-    parser.add_argument('--server_port', type=int, help='Port to run the server on (defaults to 5050 or SERVER_PORT env)')
+    parser.add_argument('--server_port', type=int, help='Port to run the server on (defaults to 5000 or SERVER_PORT env)')
     parser.add_argument('--jira_email', help='Jira account email (overrides JIRA_EMAIL env)')
     parser.add_argument('--jira_token', help='Jira API token (overrides JIRA_TOKEN env)')
     parser.add_argument('--jira_url', help='Base Jira URL, e.g. https://your-domain.atlassian.net (overrides JIRA_URL env)')
