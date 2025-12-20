@@ -35,3 +35,5 @@ sprints_cache.json
 avaliablefields.txt
 tasks-with-team-name.output.txt
 jira-dashboard.html.har
+*.juce-me
+*.pub
