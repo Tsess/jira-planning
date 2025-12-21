@@ -24,6 +24,8 @@
             --text-primary: #1a1a1a;
             --text-secondary: #666666;
             --accent: #d4380d;
+            --alert-missing: #fa8c16;
+            --alert-blocked: #d4380d;
             --border: #e0ddd7;
             --shadow: rgba(0, 0, 0, 0.04);
         }
@@ -278,6 +280,160 @@
             gap: 0.5rem;
             margin-bottom: 1.25rem;
             flex-wrap: wrap;
+        }
+
+        .alert-panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0 1.75rem;
+        }
+
+        .alert-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: 6px solid var(--accent);
+            padding: 1.2rem 1.4rem;
+            box-shadow: 0 10px 30px var(--shadow);
+        }
+
+        .alert-card.missing {
+            border-left-color: var(--alert-missing);
+        }
+
+        .alert-card.blocked {
+            border-left-color: var(--alert-blocked);
+        }
+
+        .alert-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .alert-title {
+            font-weight: 700;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .alert-subtitle {
+            flex: 1;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            min-width: 220px;
+        }
+
+        .alert-chip {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 0.2rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .alert-epic {
+            border: 1px solid var(--border);
+            padding: 0.85rem;
+            margin-bottom: 0.6rem;
+            background: #faf9f7;
+        }
+
+        .alert-epic-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.55rem;
+            flex-wrap: wrap;
+        }
+
+        .alert-epic-title {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-weight: 600;
+        }
+
+        .alert-epic-link {
+            font-size: 0.85rem;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .alert-stories {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .alert-story {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.55rem;
+            padding: 0.5rem 0.4rem;
+            border-radius: 6px;
+            border: 1px dashed var(--border);
+            background: #fff;
+        }
+
+        .alert-story:hover {
+            border-color: var(--accent);
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+
+        .alert-pill {
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: #f0f0f0;
+            font-size: 0.75rem;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #444;
+            white-space: nowrap;
+        }
+
+        .alert-pill.team {
+            background: #e6f4ff;
+            color: #0958d9;
+        }
+
+        .alert-pill.status {
+            background: #fff1f0;
+            color: #d4380d;
+        }
+
+        .alert-story-main {
+            flex: 1;
+        }
+
+        .alert-story-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .alert-story-note {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.2rem;
+        }
+
+        .alert-action {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            white-space: nowrap;
         }
 
         .task-list {
@@ -1581,6 +1737,55 @@
                 total: { todoPending: 0, accepted: 0, postponed: 0 }
             });
 
+            const hasStoryPoints = (task) => {
+                const sp = task.fields.customfield_10004;
+                if (sp === null || sp === undefined || sp === '') {
+                    return false;
+                }
+                const numeric = parseFloat(sp);
+                return !Number.isNaN(numeric) && numeric > 0;
+            };
+
+            const isExcludedStatus = (status) => status === 'killed' || status === 'postponed';
+
+            const missingInfoTasks = visibleTasks.filter(task => {
+                const status = normalizeStatus(task.fields.status?.name);
+                return !isExcludedStatus(status) && !hasStoryPoints(task);
+            });
+
+            const blockedTasks = visibleTasks.filter(task => {
+                const status = normalizeStatus(task.fields.status?.name);
+                if (!status) return false;
+                if (isExcludedStatus(status) || status === 'done') return false;
+                return status.includes('blocked');
+            });
+
+            const sortByPriorityThenSummary = (a, b) => {
+                const priorityA = priorityOrder[a.fields.priority?.name] || 999;
+                const priorityB = priorityOrder[b.fields.priority?.name] || 999;
+                if (priorityA !== priorityB) return priorityA - priorityB;
+                return (a.fields.summary || '').localeCompare(b.fields.summary || '');
+            };
+
+            const buildAlertGroups = (taskList) => {
+                const grouped = groupTasksByEpic(taskList);
+                return Object.values(grouped)
+                    .map(group => ({
+                        ...group,
+                        tasks: [...group.tasks].sort(sortByPriorityThenSummary)
+                    }))
+                    .sort((a, b) => {
+                        const diff = (b.tasks?.length || 0) - (a.tasks?.length || 0);
+                        if (diff !== 0) return diff;
+                        const nameA = (a.epic?.epicName || a.epic?.summary || a.parentSummary || a.key);
+                        const nameB = (b.epic?.epicName || b.epic?.summary || b.parentSummary || b.key);
+                        return nameA.localeCompare(nameB);
+                    });
+            };
+
+            const missingInfoGroups = buildAlertGroups(missingInfoTasks);
+            const blockedGroups = buildAlertGroups(blockedTasks);
+
 
             useEffect(() => {
                 if (!showPlanning) {
@@ -1859,6 +2064,136 @@
                         </div>
                     ) : (
                         <>
+                            {(missingInfoTasks.length > 0 || blockedTasks.length > 0) && (
+                                <div className="alert-panels">
+                                    {missingInfoTasks.length > 0 && (
+                                        <div className="alert-card missing">
+                                            <div className="alert-card-header">
+                                                <div className="alert-title">🧮 Missing Story Points</div>
+                                                <div className="alert-subtitle">These stories are wandering point-less—give them a quick estimate so planning can stop guessing.</div>
+                                                <span className="alert-chip">
+                                                    {missingInfoTasks.length} {missingInfoTasks.length === 1 ? 'story' : 'stories'}
+                                                </span>
+                                            </div>
+                                            {missingInfoGroups.map(group => {
+                                                const epicTitle = group.epic?.epicName || group.epic?.summary || group.parentSummary ||
+                                                    (group.key === 'NO_EPIC' ? 'No Epic Linked' : group.key);
+                                                return (
+                                                    <div key={group.key} className="alert-epic">
+                                                        <div className="alert-epic-head">
+                                                            <div className="alert-epic-title">
+                                                                <span className="alert-pill">EPIC</span>
+                                                                <span>{epicTitle}</span>
+                                                            </div>
+                                                            {group.key !== 'NO_EPIC' && (
+                                                                <a
+                                                                    className="alert-epic-link"
+                                                                    href={`${jiraUrl}/browse/${group.key}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    Open epic ↗
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                        <div className="alert-stories">
+                                                            {group.tasks.map(task => {
+                                                                const teamInfo = getTeamInfo(task);
+                                                                return (
+                                                                    <div key={task.key} className="alert-story">
+                                                                        <span className="alert-pill team">{teamInfo.name}</span>
+                                                                        <div className="alert-story-main">
+                                                                            <a
+                                                                                className="alert-story-link"
+                                                                                href={`${jiraUrl}/browse/${task.key}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                            >
+                                                                                {task.key} · {task.fields.summary}
+                                                                            </a>
+                                                                            <div className="alert-story-note">
+                                                                                Please add story points so this ticket stops being a mystery.
+                                                                            </div>
+                                                                        </div>
+                                                                        <a
+                                                                            className="alert-action"
+                                                                            href={`${jiraUrl}/browse/${task.key}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                        >
+                                                                            Add estimate →
+                                                                        </a>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {blockedTasks.length > 0 && (
+                                        <div className="alert-card blocked">
+                                            <div className="alert-card-header">
+                                                <div className="alert-title">⛔️ Blocked & Loud</div>
+                                                <div className="alert-subtitle">Let’s unblock these fast—call out what’s stuck, who’s needed, and what “done” looks like.</div>
+                                                <span className="alert-chip">{blockedTasks.length} blocked</span>
+                                            </div>
+                                            {blockedGroups.map(group => {
+                                                const epicTitle = group.epic?.epicName || group.epic?.summary || group.parentSummary ||
+                                                    (group.key === 'NO_EPIC' ? 'No Epic Linked' : group.key);
+                                                return (
+                                                    <div key={group.key} className="alert-epic">
+                                                        <div className="alert-epic-head">
+                                                            <div className="alert-epic-title">
+                                                                <span className="alert-pill">EPIC</span>
+                                                                <span>{epicTitle}</span>
+                                                            </div>
+                                                            {group.key !== 'NO_EPIC' && (
+                                                                <a
+                                                                    className="alert-epic-link"
+                                                                    href={`${jiraUrl}/browse/${group.key}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    Open epic ↗
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                        <div className="alert-stories">
+                                                            {group.tasks.map(task => {
+                                                                const teamInfo = getTeamInfo(task);
+                                                                const statusLabel = task.fields.status?.name || 'Blocked';
+                                                                return (
+                                                                    <div key={task.key} className="alert-story">
+                                                                        <span className="alert-pill team">{teamInfo.name}</span>
+                                                                        <div className="alert-story-main">
+                                                                            <a
+                                                                                className="alert-story-link"
+                                                                                href={`${jiraUrl}/browse/${task.key}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                            >
+                                                                                {task.key} · {task.fields.summary}
+                                                                            </a>
+                                                                            <div className="alert-story-note">
+                                                                                Blocked: let’s clarify what’s in the way and who can clear it.
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className="alert-pill status">{statusLabel}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="stats">
                                 <div
                                     className={`stat-card total ${statusFilter === null ? 'active' : ''}`}
