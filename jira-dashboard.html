@@ -1580,18 +1580,7 @@
                     });
                     return next;
                 });
-                if (!techLoaded) {
-                    loadTechTasks();
-                    setShowTech(true);
-                }
             }, [showPlanning, tasks]);
-
-            useEffect(() => {
-                if (showTech && selectedSprint !== null) {
-                    loadTechTasks();
-                }
-            }, [showTech]);
-
 
             useEffect(() => {
                 // Save selected tasks to cookie whenever they change
@@ -1639,16 +1628,16 @@
             };
 
             useEffect(() => {
-                // Load tasks when sprint or team changes (only if sprint is selected)
+                // Load tasks when sprint changes (team is filtered client-side)
                 if (selectedSprint !== null) {
                     loadProductTasks();
                     loadTechTasks();
                 }
-            }, [selectedSprint, selectedTeam]);
+            }, [selectedSprint]);
 
             useEffect(() => {
                 setTechLoaded(false);
-            }, [selectedSprint, selectedTeam]);
+            }, [selectedSprint]);
 
             useEffect(() => {
                 epicOrderRef.current = {};
@@ -1946,7 +1935,7 @@
                 return sum;
             };
 
-            const selectedTasksList = tasks.filter(task => selectedTasks[task.key]);
+            const selectedTasksList = visibleTasks.filter(task => selectedTasks[task.key]);
             const selectedSP = selectedTasksList.reduce((sum, task) => {
                 const sp = parseFloat(task.fields.customfield_10004 || 0);
                 return sum + (Number.isNaN(sp) ? 0 : sp);
@@ -2017,15 +2006,21 @@
                 }))
                 .sort((a, b) => a.name.localeCompare(b.name));
 
-            const capacityTeamIds = selectedTeam !== 'all' ? [selectedTeam] : teamCapacityEntries.map(entry => entry.id);
+            const displayedTeamCapacityEntries = selectedTeam !== 'all'
+                ? teamCapacityEntries.filter(entry => entry.id === selectedTeam)
+                : teamCapacityEntries;
 
-            const selectedTeamEntries = teamCapacityEntries.map((team) => ({
+            const capacityTeamIds = selectedTeam !== 'all'
+                ? [selectedTeam]
+                : teamCapacityEntries.map(entry => entry.id);
+
+            const selectedTeamEntries = displayedTeamCapacityEntries.map((team) => ({
                 id: team.id,
                 name: team.name,
                 storyPoints: selectedTeamStats[team.id]?.storyPoints || 0
             }));
 
-            const capacityTotals = teamCapacityEntries.reduce((acc, info) => {
+            const capacityTotals = displayedTeamCapacityEntries.reduce((acc, info) => {
                 acc.product.todoPending += info.product.todoPending;
                 acc.product.accepted += info.product.accepted;
                 acc.product.postponed += info.product.postponed;
@@ -2042,7 +2037,7 @@
                 total: { todoPending: 0, accepted: 0, postponed: 0 }
             });
 
-            const showTotalsRow = teamCapacityEntries.length > 1;
+            const showTotalsRow = displayedTeamCapacityEntries.length > 1;
 
             const formatCapacityValue = (value) => {
                 const num = Number(value || 0);
@@ -2319,7 +2314,7 @@
                                         <div className="capacity-cell metric total-col">Postponed</div>
                                         <div className="capacity-cell metric total-col divider-right">Accepted</div>
                                     </div>
-                                    {teamCapacityEntries.map((info) => (
+                                    {displayedTeamCapacityEntries.map((info) => (
                                         <div key={info.id} className="capacity-row capacity-divider">
                                             <div className="capacity-cell capacity-team">{info.name}</div>
                                             <div className="capacity-cell metric product-col">
@@ -2455,9 +2450,9 @@
                                             </div>
                                         </div>
                                     ))}
-                                    {showTotalsRow && teamCapacityEntries.length > 0 && (
+                                    {showTotalsRow && displayedTeamCapacityEntries.length > 0 && (
                                         <div className="capacity-row capacity-divider">
-                                        <div className="capacity-cell capacity-team capacity-total">Total</div>
+                                            <div className="capacity-cell capacity-team capacity-total">Total</div>
                                         <div className="capacity-cell metric product-col capacity-total">
                                             <div className="postponed-cell">
                                                 <span className={getMetricClass(capacityTotals.product.todoPending, 'todo', capacityTotals.product.accepted)}>
@@ -2591,11 +2586,11 @@
                                             </div>
                                         </div>
                                     )}
-                                    {teamCapacityEntries.length === 0 && (
+                                    {displayedTeamCapacityEntries.length === 0 && (
                                         <div className="capacity-empty">No capacity data for current filters.</div>
                                     )}
                                 </div>
-                                {teamCapacityEntries.length > 5 && (
+                                {displayedTeamCapacityEntries.length > 5 && (
                                     <div className="capacity-scroll-hint">Scroll for more teams</div>
                                 )}
                             </div>
@@ -2882,16 +2877,12 @@
                                 <button
                                     className={`toggle ${showTech ? 'active' : ''}`}
                                     onClick={() => {
-                                        const next = !showTech;
-                                        setShowTech(next);
-                                        if (next && !techLoaded) {
-                                            loadTechTasks();
-                                        }
+                                        setShowTech(!showTech);
                                     }}
                                 >
                                     {showTech
                                         ? `Hide Tech Tasks (${techTasksCount})`
-                                        : `${techLoaded ? 'Show' : 'Load'} Tech Tasks (${techTasksCount})`}
+                                        : `Show Tech Tasks (${techTasksCount})`}
                                 </button>
                                 <button
                                     className={`toggle ${showProduct ? 'active' : ''}`}
