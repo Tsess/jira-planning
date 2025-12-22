@@ -2102,24 +2102,21 @@
                                                                 return (
                                                                     <div key={task.key} className="alert-story">
                                                                         <span className="alert-pill team">{teamInfo.name}</span>
-                                                                        <div className="alert-story-main">
-                                                                            <a
-                                                                                className="alert-story-link"
-                                                                                href={`${jiraUrl}/browse/${task.key}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                            >
-                                                                                {task.key} · {task.fields.summary}
-                                                                            </a>
-                                                                            <div className="alert-story-note">
-                                                                                Please add story points so this ticket stops being a mystery.
-                                                                            </div>
-                                                                        </div>
+                                                                    <div className="alert-story-main">
                                                                         <a
-                                                                            className="alert-action"
+                                                                            className="alert-story-link"
                                                                             href={`${jiraUrl}/browse/${task.key}`}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
+                                                                        >
+                                                                            {task.key} · {task.fields.summary}
+                                                                        </a>
+                                                                    </div>
+                                                                    <a
+                                                                        className="alert-action"
+                                                                        href={`${jiraUrl}/browse/${task.key}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
                                                                         >
                                                                             Add estimate →
                                                                         </a>
@@ -2136,7 +2133,7 @@
                                     {blockedTasks.length > 0 && (
                                         <div className="alert-card blocked">
                                             <div className="alert-card-header">
-                                                <div className="alert-title">⛔️ Blocked & Loud</div>
+                                                <div className="alert-title">⛔️ Blocked</div>
                                                 <div className="alert-subtitle">Let’s unblock these fast—call out what’s stuck, who’s needed, and what “done” looks like.</div>
                                                 <span className="alert-chip">{blockedTasks.length} blocked</span>
                                             </div>
@@ -2168,23 +2165,20 @@
                                                                 return (
                                                                     <div key={task.key} className="alert-story">
                                                                         <span className="alert-pill team">{teamInfo.name}</span>
-                                                                        <div className="alert-story-main">
-                                                                            <a
-                                                                                className="alert-story-link"
-                                                                                href={`${jiraUrl}/browse/${task.key}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                            >
-                                                                                {task.key} · {task.fields.summary}
-                                                                            </a>
-                                                                            <div className="alert-story-note">
-                                                                                Blocked: let’s clarify what’s in the way and who can clear it.
-                                                                            </div>
-                                                                        </div>
-                                                                        <span className="alert-pill status">{statusLabel}</span>
+                                                                    <div className="alert-story-main">
+                                                                        <a
+                                                                            className="alert-story-link"
+                                                                            href={`${jiraUrl}/browse/${task.key}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                        >
+                                                                            {task.key} · {task.fields.summary}
+                                                                        </a>
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                    <span className="alert-pill status">{statusLabel}</span>
+                                                                </div>
+                                                            );
+                                                        })}
                                                         </div>
                                                     </div>
                                                 );
