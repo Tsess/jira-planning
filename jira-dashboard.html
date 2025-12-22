@@ -1283,7 +1283,7 @@
             const [error, setError] = useState('');
             const [showKilled, setShowKilled] = useState(false);
             const [showDone, setShowDone] = useState(true);
-            const [showTech, setShowTech] = useState(false);
+            const [showTech, setShowTech] = useState(true);
             const [showProduct, setShowProduct] = useState(true);
             const [sprintName, setSprintName] = useState('Sprint');
             const [statusFilter, setStatusFilter] = useState(null); // null = show all, 'in-progress', 'todo-accepted', 'done', 'high-priority'
@@ -1360,9 +1360,7 @@
                 // Load tasks when sprint or team changes (only if sprint is selected)
                 if (selectedSprint !== null) {
                     loadProductTasks();
-                    if (showTech) {
-                        loadTechTasks();
-                    }
+                    loadTechTasks();
                 }
             }, [selectedSprint, selectedTeam]);
 
@@ -1907,9 +1905,7 @@
                                 className="secondary"
                                 onClick={() => {
                                     loadProductTasks();
-                                    if (showTech) {
-                                        loadTechTasks();
-                                    }
+                                    loadTechTasks();
                                 }}
                                 disabled={loading || selectedSprint === null}
                                 title="Refresh tasks from Jira"
