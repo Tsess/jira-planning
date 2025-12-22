@@ -1171,6 +1171,41 @@
             font-size: 0.7rem;
         }
 
+        .planning-stat-separator {
+            margin-left: 0.4rem;
+            color: var(--text-secondary);
+        }
+
+        .team-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .team-stat-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.75rem;
+            text-align: center;
+            box-shadow: 0 6px 16px var(--shadow);
+        }
+
+        .team-stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .team-stat-label {
+            margin-top: 0.25rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
         .uncheck-button {
             background: transparent;
             color: var(--text-secondary);
@@ -1518,7 +1553,8 @@
                     const params = new URLSearchParams({
                         t: Date.now().toString(),
                         sprint: selectedSprint || '',
-                        team: selectedTeam,
+                        // always pull all teams; filtering happens client-side so capacity table can show every team
+                        team: 'all',
                         project: project || 'all'
                     });
                     const response = await fetch(`${BACKEND_URL}/api/tasks-with-team-name?${params}`, {
@@ -1574,13 +1610,14 @@
             };
 
             const tasks = showTech ? [...productTasks, ...techTasks] : [...productTasks];
+            const capacityTasks = [...productTasks, ...techTasks];
             const killedTasks = tasks.filter(t => t.fields.status?.name === 'Killed');
             const doneTasks = tasks.filter(t => t.fields.status?.name === 'Done');
             const techTasksCount = techTasks.length;
             const productTasksCount = productTasks.length;
 
-            const teamOptions = ['all', ...new Set(tasks.map(t => getTeamInfo(t).id || 'unknown'))]
-                .map(id => ({ id, name: id === 'all' ? 'All Teams' : getTeamInfo(tasks.find(t => getTeamInfo(t).id === id) || {}).name }))
+            const teamOptions = ['all', ...new Set(capacityTasks.map(t => getTeamInfo(t).id || 'unknown'))]
+                .map(id => ({ id, name: id === 'all' ? 'All Teams' : getTeamInfo(capacityTasks.find(t => getTeamInfo(t).id === id) || {}).name }))
                 .filter((team, index, arr) => arr.findIndex(t => t.id === team.id) === index);
 
             const visibleTasks = tasks.filter(task => {
@@ -1719,36 +1756,34 @@
                 return sum;
             };
 
-            const selectedSP = calculateSelectedSP();
-            const selectedCount = Object.keys(selectedTasks).filter(key =>
-                visibleTasks.some(task => task.key === key)
-            ).length;
+            const selectedTasksList = tasks.filter(task => selectedTasks[task.key]);
+            const selectedSP = selectedTasksList.reduce((sum, task) => {
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                return sum + (Number.isNaN(sp) ? 0 : sp);
+            }, 0);
+            const selectedCount = selectedTasksList.length;
 
-            const selectedTeamStats = visibleTasks.reduce((acc, task) => {
-                if (selectedTasks[task.key]) {
-                    const teamInfo = getTeamInfo(task);
-                    const sp = parseFloat(task.fields.customfield_10004 || 0);
-                    if (!acc[teamInfo.id]) {
-                        acc[teamInfo.id] = { name: teamInfo.name, storyPoints: 0 };
-                    }
-                    acc[teamInfo.id].storyPoints += sp;
+            const selectedTeamStats = selectedTasksList.reduce((acc, task) => {
+                const teamInfo = getTeamInfo(task);
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                if (!acc[teamInfo.id]) {
+                    acc[teamInfo.id] = { name: teamInfo.name, storyPoints: 0 };
                 }
+                acc[teamInfo.id].storyPoints += sp;
                 return acc;
             }, {});
 
-            const selectedProjectStats = visibleTasks.reduce((acc, task) => {
-                if (selectedTasks[task.key]) {
-                    const projectKey = task.key.split('-')[0];
-                    const sp = parseFloat(task.fields.customfield_10004 || 0);
-                    if (!acc[projectKey]) {
-                        acc[projectKey] = 0;
-                    }
-                    acc[projectKey] += sp;
+            const selectedProjectStats = selectedTasksList.reduce((acc, task) => {
+                const projectKey = task.key.split('-')[0];
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                if (!acc[projectKey]) {
+                    acc[projectKey] = 0;
                 }
+                acc[projectKey] += sp;
                 return acc;
             }, {});
 
-            const teamCapacityStats = visibleTasks.reduce((acc, task) => {
+            const teamCapacityStats = capacityTasks.reduce((acc, task) => {
                 const status = normalizeStatus(task.fields.status?.name);
                 const sp = parseFloat(task.fields.customfield_10004 || 0);
                 if (!sp) {
@@ -1791,6 +1826,12 @@
                     }
                 }))
                 .sort((a, b) => a.name.localeCompare(b.name));
+
+            const selectedTeamEntries = teamCapacityEntries.map((team) => ({
+                id: team.id,
+                name: team.name,
+                storyPoints: selectedTeamStats[team.id]?.storyPoints || 0
+            }));
 
             const capacityTotals = teamCapacityEntries.reduce((acc, info) => {
                 acc.product.todoPending += info.product.todoPending;
@@ -2218,13 +2259,15 @@
                             <div className="planning-stat">
                                 <span className="planning-stat-label">Selected SP by Team:</span>
                             </div>
-                            {Object.entries(selectedTeamStats).map(([teamId, info]) => (
-                                <div key={teamId} className="planning-stat">
-                                    <span className="planning-stat-label">{info.name}:</span>
-                                    <span className="planning-stat-value">{info.storyPoints.toFixed(1)} SP</span>
+                        </div>
+                        <div className="team-stats-grid">
+                            {selectedTeamEntries.map((info) => (
+                                <div key={info.id} className="team-stat-card">
+                                    <div className="team-stat-value">{info.storyPoints.toFixed(1)}</div>
+                                    <div className="team-stat-label">{info.name}</div>
                                 </div>
                             ))}
-                            {Object.keys(selectedTeamStats).length === 0 && (
+                            {selectedTeamEntries.length === 0 && (
                                 <div className="planning-stat">
                                     <span className="planning-stat-value">No tasks selected</span>
                                 </div>
@@ -2234,16 +2277,17 @@
                             <div className="planning-stat">
                                 <span className="planning-stat-label">Selected SP by Project:</span>
                             </div>
-                            {Object.entries(selectedProjectStats).map(([projectKey, sp]) => (
+                            {Object.entries(selectedProjectStats).map(([projectKey, sp], index, arr) => (
                                 <div key={projectKey} className="planning-stat">
                                     <span className="planning-stat-label">{projectKey}:</span>
-                                    <span className="planning-stat-value">{sp.toFixed(1)} SP</span>
+                                    <span className="planning-stat-value">{sp.toFixed(1)}</span>
+                                    {index < arr.length - 1 && <span className="planning-stat-separator">•</span>}
                                 </div>
                             ))}
                             {Object.keys(selectedProjectStats).length > 0 && (
                                 <div className="planning-stat">
                                     <span className="planning-stat-label">Total:</span>
-                                    <span className="planning-stat-value">{selectedSP.toFixed(1)} SP</span>
+                                    <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
                                 </div>
                             )}
                         </div>
