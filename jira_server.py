@@ -32,10 +32,12 @@ JQL_QUERY = os.getenv('JQL_QUERY', 'project IN (PRODUCT, TECH) ORDER BY created 
 JIRA_BOARD_ID = os.getenv('JIRA_BOARD_ID')  # Optional: board ID for faster sprint fetching
 JIRA_TEAM_FIELD_ID = os.getenv('JIRA_TEAM_FIELD_ID', 'customfield_30101')  # Optional: custom field id for Team[Team]
 JIRA_TEAM_FALLBACK_FIELD_ID = 'customfield_30101'
+JIRA_EPIC_LINK_FIELD_ID = os.getenv('JIRA_EPIC_LINK_FIELD_ID', '').strip()  # Optional: custom field id for Epic Link
 JIRA_PRODUCT_PROJECT = os.getenv('JIRA_PRODUCT_PROJECT', 'PRODUCT ROADMAPS')
 JIRA_TECH_PROJECT = os.getenv('JIRA_TECH_PROJECT', 'TECHNICAL ROADMAP')
 SERVER_PORT = int(os.getenv('SERVER_PORT', '5050'))
-LOCAL_TASKS_FILE = os.getenv('LOCAL_TASKS_FILE', 'tasks.test.local.json')
+EPIC_EMPTY_EXCLUDED_STATUSES = [s.strip() for s in os.getenv('EPIC_EMPTY_EXCLUDED_STATUSES', 'Killed,Done,Incomplete').split(',') if s.strip()]
+EPIC_EMPTY_TEAM_IDS = [s.strip() for s in os.getenv('EPIC_EMPTY_TEAM_IDS', '').split(',') if s.strip()]
 
 # Cache settings
 SPRINTS_CACHE_FILE = 'sprints_cache.json'
@@ -64,6 +66,7 @@ def add_clause_to_jql(jql: str, clause: str) -> str:
 
 
 TEAM_FIELD_CACHE = None
+EPIC_LINK_FIELD_CACHE = None
 
 
 def resolve_team_field_id(headers):
@@ -86,6 +89,38 @@ def resolve_team_field_id(headers):
             if name == 'team[team]':
                 TEAM_FIELD_CACHE = field.get('id')
                 return TEAM_FIELD_CACHE
+    except Exception:
+        return None
+
+    return None
+
+
+def resolve_epic_link_field_id(headers, names_map=None):
+    """Resolve the Jira custom field ID for Epic Link."""
+    global EPIC_LINK_FIELD_CACHE
+    if EPIC_LINK_FIELD_CACHE:
+        return EPIC_LINK_FIELD_CACHE
+    if JIRA_EPIC_LINK_FIELD_ID:
+        EPIC_LINK_FIELD_CACHE = JIRA_EPIC_LINK_FIELD_ID
+        return EPIC_LINK_FIELD_CACHE
+
+    if names_map:
+        for field_id, field_name in (names_map or {}).items():
+            if str(field_name).strip().lower() == 'epic link':
+                EPIC_LINK_FIELD_CACHE = field_id
+                return EPIC_LINK_FIELD_CACHE
+
+    try:
+        response = requests.get(f'{JIRA_URL}/rest/api/3/field', headers=headers, timeout=20)
+        if response.status_code != 200:
+            return None
+
+        fields = response.json() or []
+        for field in fields:
+            name = str(field.get('name', '')).strip().lower()
+            if name == 'epic link':
+                EPIC_LINK_FIELD_CACHE = field.get('id')
+                return EPIC_LINK_FIELD_CACHE
     except Exception:
         return None
 
@@ -172,12 +207,6 @@ def save_sprints_cache(sprints):
     except Exception as e:
         print(f'⚠️ Failed to save cache: {e}')
         return False
-
-
-def load_local_json(path):
-    """Load JSON from a local file and return dict; raises on failure."""
-    with open(path, 'r') as handle:
-        return json.load(handle)
 
 
 def is_cache_valid():
@@ -316,7 +345,7 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
         payload = {
             'jql': jql,
             'maxResults': len(batch_keys),
-            'fields': ['summary', 'reporter', epic_field]
+            'fields': ['summary', 'reporter', 'assignee', epic_field]
         }
 
         try:
@@ -333,12 +362,184 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
                     'key': key,
                     'summary': fields.get('summary'),
                     'reporter': (fields.get('reporter') or {}).get('displayName'),
+                    'assignee': {'displayName': (fields.get('assignee') or {}).get('displayName')} if fields.get('assignee') else None,
                     'epicName': fields.get(epic_field)
                 }
         except Exception as exc:
             print(f'⚠️ Epic batch fetch error: {exc}')
 
     return epic_details
+
+
+def derive_epic_jql(base_jql: str, team_ids=None) -> str:
+    """Attempt to derive an epic query from a story query by swapping Story→Epic."""
+    if not base_jql:
+        base_jql = ''
+
+    jql = base_jql
+    replacements = [
+        ('type = Story', 'type = Epic'),
+        ('type=Story', 'type=Epic'),
+        ('type = "Story"', 'type = "Epic"'),
+        ("type = 'Story'", "type = 'Epic'"),
+        ('issuetype = Story', 'issuetype = Epic'),
+        ('issuetype=Story', 'issuetype=Epic'),
+        ('issuetype = "Story"', 'issuetype = "Epic"'),
+        ("issuetype = 'Story'", "issuetype = 'Epic'"),
+    ]
+    replaced = False
+    for old, new in replacements:
+        if old in jql:
+            jql = jql.replace(old, new)
+            replaced = True
+
+    if not replaced:
+        jql = add_clause_to_jql(jql, 'type = Epic') if jql else 'type = Epic'
+
+    if EPIC_EMPTY_EXCLUDED_STATUSES:
+        quoted = ', '.join(f'"{s}"' for s in EPIC_EMPTY_EXCLUDED_STATUSES)
+        jql = add_clause_to_jql(jql, f'status not in ({quoted})')
+
+    team_ids = [t.strip() for t in (team_ids or []) if t and str(t).strip()]
+    if team_ids:
+        if len(team_ids) == 1:
+            jql = add_clause_to_jql(jql, f'"Team[Team]" = "{team_ids[0]}"')
+        else:
+            quoted_teams = ', '.join(f'"{t}"' for t in team_ids)
+            jql = add_clause_to_jql(jql, f'"Team[Team]" in ({quoted_teams})')
+    return jql
+
+
+def fetch_epics_for_empty_alert(jql, headers, team_field_id, epic_name_field):
+    """Fetch epics matching the current sprint/team filters so UI can flag epics with 0 stories."""
+    epic_jql = derive_epic_jql(jql, EPIC_EMPTY_TEAM_IDS)
+    epic_field = epic_name_field or 'customfield_10011'
+
+    fields_list = ['summary', 'status', 'assignee', epic_field]
+    if team_field_id and team_field_id not in fields_list:
+        fields_list.append(team_field_id)
+    if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
+        fields_list.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+    payload = {
+        'jql': epic_jql,
+        'startAt': 0,
+        'maxResults': 250,
+        'fields': fields_list
+    }
+    resp = jira_search_request(headers, payload)
+    if resp.status_code != 200:
+        print(f'⚠️ Epic empty-state fetch failed: {resp.status_code}')
+        return []
+
+    data = resp.json() or {}
+    issues = data.get('issues', []) or []
+    epics = []
+    for issue in issues:
+        fields = issue.get('fields', {}) or {}
+
+        raw_team = None
+        if fields.get(JIRA_TEAM_FALLBACK_FIELD_ID) is not None:
+            raw_team = fields.get(JIRA_TEAM_FALLBACK_FIELD_ID)
+        elif team_field_id and fields.get(team_field_id) is not None:
+            raw_team = fields.get(team_field_id)
+
+        team_value = build_team_value(raw_team) if raw_team is not None else None
+        team_name = extract_team_name(raw_team) if raw_team is not None else None
+
+        assignee = fields.get('assignee') or {}
+        status = fields.get('status') or {}
+        epics.append({
+            'key': issue.get('key'),
+            'summary': fields.get('summary'),
+            'status': {'name': status.get('name')} if status else None,
+            'assignee': {'displayName': assignee.get('displayName')} if assignee else None,
+            'epicName': fields.get(epic_field),
+            'team': team_value,
+            'teamName': team_name,
+            'teamId': team_value.get('id') if isinstance(team_value, dict) else None,
+        })
+    return epics
+
+
+def fetch_story_counts_for_epics(epic_keys, headers, epic_link_field):
+    """Return total Story counts for each epic key.
+
+    Prefer counting via the Epic Link field (company-managed Jira). If that yields zero for an epic,
+    fall back to counting via `parent` (team-managed projects / some Jira configs).
+    """
+    epic_keys = [k for k in (epic_keys or []) if k]
+    if not epic_keys:
+        return {}
+
+    def count_by_query(batch_keys, jql, parse_epic_key, fields):
+        start_at = 0
+        max_results = 250
+        local_counts = {k: 0 for k in batch_keys}
+
+        while True:
+            payload = {
+                'jql': jql,
+                'startAt': start_at,
+                'maxResults': max_results,
+                'fields': fields
+            }
+            resp = jira_search_request(headers, payload)
+            if resp.status_code != 200:
+                return local_counts
+
+            data = resp.json() or {}
+            issues = data.get('issues', []) or []
+            if not issues:
+                break
+
+            for issue in issues:
+                fields_obj = issue.get('fields', {}) or {}
+                epic_key = parse_epic_key(fields_obj)
+                if epic_key in local_counts:
+                    local_counts[epic_key] += 1
+
+            start_at += len(issues)
+            total = data.get('total')
+            if total is not None and start_at >= total:
+                break
+            if len(issues) < max_results:
+                break
+
+        return local_counts
+
+    counts = {k: 0 for k in epic_keys}
+    batch_size = 40
+
+    for start in range(0, len(epic_keys), batch_size):
+        batch = epic_keys[start:start + batch_size]
+
+        # 1) Try Epic Link counting (company-managed)
+        if epic_link_field:
+            epic_link_jql = f'"Epic Link" in ({",".join(batch)}) AND issuetype = Story'
+            link_counts = count_by_query(
+                batch,
+                epic_link_jql,
+                lambda f: f.get(epic_link_field),
+                [epic_link_field]
+            )
+            for k, v in link_counts.items():
+                counts[k] += v
+
+        # 2) Fall back to parent counting for epics that still have 0
+        remaining = [k for k in batch if counts.get(k, 0) == 0]
+        if remaining:
+            parent_jql = f'parent in ({",".join(remaining)}) AND issuetype = Story'
+            parent_counts = count_by_query(
+                remaining,
+                parent_jql,
+                lambda f: (f.get('parent') or {}).get('key'),
+                ['parent']
+            )
+            for k, v in parent_counts.items():
+                counts[k] += v
+
+    return counts
 
 
 def fetch_tasks(include_team_name=False):
@@ -374,6 +575,7 @@ def fetch_tasks(include_team_name=False):
             jql = add_clause_to_jql(jql, f'project = "{project_name}"')
 
         team_field_id = resolve_team_field_id(headers)
+        epic_link_field_id = resolve_epic_link_field_id(headers)
 
         # Prepare request parameters for search endpoint
         fields_list = [
@@ -386,6 +588,8 @@ def fetch_tasks(include_team_name=False):
             'customfield_10004',  # Story Points
             'parent'
         ]
+        if epic_link_field_id and epic_link_field_id not in fields_list:
+            fields_list.append(epic_link_field_id)
         if team_field_id:
             fields_list.append(team_field_id)
         if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
@@ -469,7 +673,7 @@ def fetch_tasks(include_team_name=False):
 
         if not team_field_id:
             team_field_id = next((k for k, v in names_map.items() if str(v).lower() == 'team[team]'), None)
-        epic_link_field = next((k for k, v in names_map.items() if str(v).lower() == 'epic link'), None)
+        epic_link_field = epic_link_field_id or resolve_epic_link_field_id(headers, names_map)
         epic_name_field = next((k for k, v in names_map.items() if str(v).lower() == 'epic name'), None)
 
         epic_keys = set()
@@ -505,6 +709,11 @@ def fetch_tasks(include_team_name=False):
                 epic_keys.add(epic_key)
 
         epic_details = fetch_epic_details_bulk(epic_keys, headers, epic_name_field)
+        epics_in_scope = fetch_epics_for_empty_alert(jql, headers, team_field_id, epic_name_field)
+        epic_story_counts = fetch_story_counts_for_epics([e.get('key') for e in epics_in_scope], headers, epic_link_field) if epic_link_field else None
+        for epic in epics_in_scope:
+            key = epic.get('key')
+            epic['totalStories'] = epic_story_counts.get(key) if (epic_story_counts and key) else None
         slim_issues = []
         for issue in collected_issues:
             fields = issue.get('fields', {})
@@ -533,6 +742,7 @@ def fetch_tasks(include_team_name=False):
 
         data['issues'] = slim_issues
         data['epics'] = epic_details
+        data['epicsInScope'] = epics_in_scope
         data['teamFieldId'] = team_field_id
 
         print(f'✅ Success! Found {len(data.get("issues", []))} issues')
@@ -565,77 +775,6 @@ def get_tasks():
 def get_tasks_with_team_name():
     """Fetch tasks with team name derived from Jira Team field."""
     return fetch_tasks(include_team_name=True)
-
-
-@app.route('/api/local-tasks', methods=['GET'])
-def get_local_tasks():
-    """
-    Serve tasks from local JSON files for development.
-    - If ?file=/path/to/file.json is provided, that file is used.
-    - Otherwise reads LOCAL_TASKS_FILE (default tasks.test.local.json).
-    """
-    try:
-        file_override = request.args.get('file', '').strip()
-
-        candidates = [file_override] if file_override else [LOCAL_TASKS_FILE]
-
-        issues = []
-        epics = {}
-        names = {}
-        used_files = []
-
-        for path in candidates:
-            if not path:
-                continue
-            if not os.path.exists(path):
-                print(f'⚠️ Local tasks file not found: {path}')
-                continue
-
-            try:
-                data = load_local_json(path)
-                used_files.append(path)
-
-                if isinstance(data, list):
-                    issues.extend(data)
-                    continue
-
-                if isinstance(data, dict):
-                    issues.extend(data.get('issues') or data.get('tasks') or [])
-                    epics.update(data.get('epics') or {})
-                    names.update(data.get('names') or {})
-            except Exception as file_error:
-                print(f'⚠️ Failed to read {path}: {file_error}')
-                continue
-
-        if not issues:
-            return jsonify({
-                'error': 'No local data found',
-                'searched_files': candidates
-            }), 404
-
-        response = jsonify({
-            'source': 'local-file',
-            'filesUsed': used_files,
-            'issues': issues,
-            'epics': epics,
-            'names': names,
-            'count': len(issues)
-        })
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
-
-    except Exception as e:
-        print(f'❌ Local tasks error: {str(e)}')
-        import traceback
-        traceback.print_exc()
-        error_response = jsonify({
-            'error': 'Failed to load local tasks',
-            'message': str(e)
-        })
-        error_response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        return error_response, 500
 
 
 @app.route('/api/boards', methods=['GET'])
@@ -1028,7 +1167,6 @@ if __name__ == '__main__':
     print('\n📋 Endpoints:')
     print(f'   • http://localhost:{SERVER_PORT}/api/tasks - Get sprint tasks')
     print(f'   • http://localhost:{SERVER_PORT}/api/tasks-with-team-name - Get sprint tasks with team names')
-    print(f'   • http://localhost:{SERVER_PORT}/api/local-tasks - Get tasks from local JSON files (dev)')
     print(f'   • http://localhost:{SERVER_PORT}/api/sprints - Get available sprints (cached)')
     print(f'   • http://localhost:{SERVER_PORT}/api/sprints?refresh=true - Force refresh sprints cache')
     print(f'   • http://localhost:{SERVER_PORT}/api/boards - Get all boards (to find board ID)')
