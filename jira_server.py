@@ -38,6 +38,8 @@ JIRA_TECH_PROJECT = os.getenv('JIRA_TECH_PROJECT', 'TECHNICAL ROADMAP')
 SERVER_PORT = int(os.getenv('SERVER_PORT', '5050'))
 EPIC_EMPTY_EXCLUDED_STATUSES = [s.strip() for s in os.getenv('EPIC_EMPTY_EXCLUDED_STATUSES', 'Killed,Done,Incomplete').split(',') if s.strip()]
 EPIC_EMPTY_TEAM_IDS = [s.strip() for s in os.getenv('EPIC_EMPTY_TEAM_IDS', '').split(',') if s.strip()]
+JIRA_MAX_RESULTS = int(os.getenv('JIRA_MAX_RESULTS', '1000'))
+JIRA_PAGE_SIZE = int(os.getenv('JIRA_PAGE_SIZE', '100'))
 
 # Cache settings
 SPRINTS_CACHE_FILE = 'sprints_cache.json'
@@ -363,7 +365,6 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
                     'summary': fields.get('summary'),
                     'reporter': (fields.get('reporter') or {}).get('displayName'),
                     'assignee': {'displayName': (fields.get('assignee') or {}).get('displayName')} if fields.get('assignee') else None,
-                    'epicName': fields.get(epic_field)
                 }
         except Exception as exc:
             print(f'⚠️ Epic batch fetch error: {exc}')
@@ -454,7 +455,6 @@ def fetch_epics_for_empty_alert(jql, headers, team_field_id, epic_name_field):
             'summary': fields.get('summary'),
             'status': {'name': status.get('name')} if status else None,
             'assignee': {'displayName': assignee.get('displayName')} if assignee else None,
-            'epicName': fields.get(epic_field),
             'team': team_value,
             'teamName': team_name,
             'teamId': team_value.get('id') if isinstance(team_value, dict) else None,
@@ -597,7 +597,8 @@ def fetch_tasks(include_team_name=False):
         if not team_field_id:
             print('⚠️ Team field id not resolved; using customfield_30101 fallback.')
 
-        max_results = 250
+        max_results = max(1, JIRA_MAX_RESULTS)
+        page_size = min(max(1, JIRA_PAGE_SIZE), 250)
         start_at = 0
         collected_issues = []
         names_map = {}
@@ -612,7 +613,7 @@ def fetch_tasks(include_team_name=False):
             payload = {
                 'jql': jql,
                 'startAt': start_at,
-                'maxResults': max_results,
+                'maxResults': min(page_size, max_results - len(collected_issues)),
                 'fields': fields_list
             }
 

@@ -2298,8 +2298,8 @@
                     .sort((a, b) => {
                         const diff = (b.tasks?.length || 0) - (a.tasks?.length || 0);
                         if (diff !== 0) return diff;
-                        const nameA = (a.epic?.epicName || a.epic?.summary || a.parentSummary || a.key);
-                        const nameB = (b.epic?.epicName || b.epic?.summary || b.parentSummary || b.key);
+                        const nameA = (a.epic?.summary || a.parentSummary || a.key);
+                        const nameB = (b.epic?.summary || b.parentSummary || b.key);
                         return nameA.localeCompare(nameB);
                     });
             };
@@ -2946,7 +2946,7 @@
                                             {showMissingAlert && (
                                                 <div className="alert-card-body">
                                                     {missingInfoGroups.map(group => {
-                                                        const epicTitle = group.epic?.epicName || group.epic?.summary || group.parentSummary ||
+                                                        const epicTitle = group.epic?.summary || group.parentSummary ||
                                                             (group.key === 'NO_EPIC' ? 'No Epic Linked' : group.key);
                                                         return (
                                                             <div key={group.key} className="alert-epic">
@@ -3034,8 +3034,8 @@
 	                                            {showBlockedAlert && (
 	                                                <div className="alert-card-body">
 	                                                    {blockedGroups.map(group => {
-	                                                        const epicTitle = group.epic?.epicName || group.epic?.summary || group.parentSummary ||
-	                                                            (group.key === 'NO_EPIC' ? 'No Epic Linked' : group.key);
+                                                        const epicTitle = group.epic?.summary || group.parentSummary ||
+                                                            (group.key === 'NO_EPIC' ? 'No Epic Linked' : group.key);
 	                                                        return (
 	                                                            <div key={group.key} className="alert-epic">
 	                                                                <div className="alert-epic-head">
@@ -3192,7 +3192,7 @@
 	                                                                        target="_blank"
 	                                                                        rel="noopener noreferrer"
 	                                                                    >
-	                                                                        {epic.key} · {epic.epicName || epic.summary}
+	                                                                        {epic.key} · {epic.summary}
 	                                                                    </a>
 	                                                                </div>
 	                                                                {epic.status?.name && (
@@ -3256,7 +3256,7 @@
 	                                                                        target="_blank"
 	                                                                        rel="noopener noreferrer"
 	                                                                    >
-	                                                                        {epic.key} · {epic.epicName || epic.summary}
+	                                                                        {epic.key} · {epic.summary}
 	                                                                    </a>
 	                                                                </div>
 	                                                                {epic.assignee?.displayName && (
@@ -3361,7 +3361,7 @@
                                 <div className="task-list">
                                     {epicGroups.map(epicGroup => {
                                         const epicInfo = epicGroup.epic;
-                                        const epicTitle = epicInfo?.epicName || epicInfo?.summary || epicGroup.parentSummary ||
+                                        const epicTitle = epicInfo?.summary || epicGroup.parentSummary ||
                                             (epicGroup.key === 'NO_EPIC' ? 'No Epic Linked' : epicGroup.key);
                                         const epicTotalSp = epicGroup.storyPoints || 0;
 
