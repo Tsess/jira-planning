@@ -292,13 +292,13 @@
 	            margin: 1.5rem 0 1.75rem;
 	        }
 
-        .alert-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-left: 6px solid var(--accent);
-            padding: 1.2rem 1.4rem;
-            box-shadow: 0 10px 30px var(--shadow);
-        }
+	        .alert-card {
+	            background: var(--bg-secondary);
+	            border: 1px solid var(--border);
+	            border-left: 6px solid var(--accent);
+	            padding: 1.2rem 1.4rem;
+	            box-shadow: 0 10px 30px var(--shadow);
+	        }
 
         .alert-card.missing {
             border-left-color: var(--alert-missing);
@@ -320,14 +320,14 @@
 	            border-left-color: #52c41a;
 	        }
 
-        .alert-card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 0.8rem;
-            flex-wrap: wrap;
-        }
+	        .alert-card-header {
+	            display: flex;
+	            align-items: center;
+	            justify-content: space-between;
+	            gap: 0.75rem;
+	            margin-bottom: 0.8rem;
+	            flex-wrap: wrap;
+	        }
 
         .alert-title {
             font-weight: 700;
@@ -400,9 +400,9 @@
             letter-spacing: 0.02em;
         }
 
-        .alert-card-body {
-            margin-top: 0.5rem;
-        }
+	        .alert-card-body {
+	            margin-top: 0.5rem;
+	        }
 
         .alert-epic {
             border: 1px solid var(--border);
@@ -1864,15 +1864,19 @@
                 .map(id => ({ id, name: id === 'all' ? 'All Teams' : getTeamInfo(capacityTasks.find(t => getTeamInfo(t).id === id) || {}).name }))
                 .filter((team, index, arr) => arr.findIndex(t => t.id === team.id) === index);
 
-            const visibleTasks = tasks.filter(task => {
-                // Filter by search query
-                if (searchQuery.trim() !== '') {
-                    const summary = task.fields.summary?.toLowerCase() || '';
-                    const query = searchQuery.toLowerCase();
-                    if (!summary.includes(query)) {
-                        return false;
-                    }
-                }
+	            const visibleTasks = tasks.filter(task => {
+	                // Filter by search query
+	                if (searchQuery.trim() !== '') {
+	                    const query = searchQuery.toLowerCase();
+	                    const summary = task.fields.summary?.toLowerCase() || '';
+	                    const key = String(task.key || '').toLowerCase();
+	                    const assignee = task.fields.assignee?.displayName?.toLowerCase() || '';
+	                    const epicAssignee = task.fields.epicKey ? (epicDetails[task.fields.epicKey]?.assignee?.displayName?.toLowerCase() || '') : '';
+
+	                    if (!summary.includes(query) && !key.includes(query) && !assignee.includes(query) && !epicAssignee.includes(query)) {
+	                        return false;
+	                    }
+	                }
 
                 // Filter by Team
                 if (selectedTeam !== 'all') {
