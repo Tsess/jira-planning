@@ -2235,14 +2235,7 @@
                     if (selectedTeam !== 'all' && epic.teamId && epic.teamId !== selectedTeam) return false;
                     return true;
                 })
-                .filter(epic => {
-                    const hasStory = capacityTasks.some(task => {
-                        if (!task.fields?.epicKey) return false;
-                        if (selectedTeam !== 'all' && getTeamInfo(task).id !== selectedTeam) return false;
-                        return task.fields.epicKey === epic.key;
-                    });
-                    return !hasStory;
-                });
+                .filter(epic => typeof epic.totalStories === 'number' && epic.totalStories === 0);
 
             const doneStoryEpics = epicsInScope
                 .filter(epic => {

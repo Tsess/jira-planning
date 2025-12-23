@@ -41,15 +41,7 @@ More detailed setup guidance remains below if you need it.
 
 ### Local mock data (dev)
 
-If you want to develop without hitting Jira, the backend can serve tasks from local JSON files:
-
-- Put your sample response in the repo (default filename `tasks.test.local.json`).
-- Point to it in `.env` with `LOCAL_TASKS_FILE=./tasks.test.local.json` (default already set).
-- Start the server and hit:
-  - `http://localhost:5050/api/local-tasks` (uses `LOCAL_TASKS_FILE`).
-  - `http://localhost:5050/api/local-tasks?file=/full/path/to/snapshot.json` (explicit file override).
-
-The endpoint returns the same shape as `/api/tasks-with-team-name` (issues + epics), so you can wire it into the UI or use curl/Postman during frontend work.
+If you want to develop UI changes without hitting Jira, keep JSON snapshots locally (untracked) and use them as data fixtures in your tooling/tests.
 
 ### Step 1: Clone the repository
 
