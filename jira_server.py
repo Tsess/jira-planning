@@ -316,7 +316,7 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
         payload = {
             'jql': jql,
             'maxResults': len(batch_keys),
-            'fields': ['summary', 'reporter', epic_field]
+            'fields': ['summary', 'reporter', 'assignee', epic_field]
         }
 
         try:
@@ -333,6 +333,7 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
                     'key': key,
                     'summary': fields.get('summary'),
                     'reporter': (fields.get('reporter') or {}).get('displayName'),
+                    'assignee': {'displayName': (fields.get('assignee') or {}).get('displayName')} if fields.get('assignee') else None,
                     'epicName': fields.get(epic_field)
                 }
         except Exception as exc:
