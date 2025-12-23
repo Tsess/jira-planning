@@ -1267,6 +1267,19 @@
             color: var(--accent);
         }
 
+        .accepted-link {
+            opacity: 0.6;
+            font-size: 0.85em;
+            text-decoration: none;
+            color: inherit;
+            transition: opacity 0.2s ease, color 0.2s ease;
+        }
+
+        .postponed-cell:hover .accepted-link {
+            opacity: 1;
+            color: var(--accent);
+        }
+
         .planning-stats {
             display: flex;
             gap: 3rem;
@@ -1355,41 +1368,39 @@
             border-color: var(--border);
         }
 
-        .excel-button {
-            background: #107c41;
-            color: white;
-            border: 1px solid #107c41;
+        .planning-action-button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
             padding: 0.4rem 1rem;
             font-size: 0.7rem;
             margin: 0;
-            margin-left: 1rem;
             cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+            display: inline-flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .excel-button:hover {
-            background: #0d6b37;
-            border-color: #0d6b37;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(16, 124, 65, 0.3);
+        .planning-action-button:hover {
+            background: rgba(22, 119, 255, 0.08);
+            color: var(--text);
+            border-color: rgba(22, 119, 255, 0.25);
+            transform: none;
         }
 
-        .excel-button:disabled {
+        .planning-action-button:disabled {
             opacity: 0.3;
             cursor: not-allowed;
         }
 
-        .excel-button:disabled:hover {
-            background: #107c41;
-            border-color: #107c41;
-            transform: none;
-            box-shadow: none;
+        .planning-action-button:disabled:hover {
+            background: transparent;
+            color: var(--text-secondary);
+            border-color: var(--border);
         }
 
-        .excel-button svg {
+        .planning-action-button svg {
             width: 1rem;
             height: 1rem;
         }
@@ -1569,18 +1580,8 @@
             useEffect(() => {
                 if (!showPlanning) {
                     setPlanningOffset(0);
-                    return;
                 }
-                setSelectedTasks(prev => {
-                    const next = { ...prev };
-                    tasks.forEach(task => {
-                        if (normalizeStatus(task.fields.status?.name) === 'accepted') {
-                            next[task.key] = true;
-                        }
-                    });
-                    return next;
-                });
-            }, [showPlanning, tasks]);
+            }, [showPlanning]);
 
             useEffect(() => {
                 // Save selected tasks to cookie whenever they change
@@ -1921,6 +1922,20 @@
                 setSelectedTasks({});
             };
 
+            const selectPlanningTasksByStatus = (statuses) => {
+                const allowed = new Set((statuses || []).map(normalizeStatus));
+                setSelectedTasks(() => {
+                    const next = {};
+                    visibleTasks.forEach(task => {
+                        const status = normalizeStatus(task.fields.status?.name);
+                        if (allowed.has(status)) {
+                            next[task.key] = true;
+                        }
+                    });
+                    return next;
+                });
+            };
+
             // Calculate sum of Story Points for selected tasks
             const calculateSelectedSP = () => {
                 let sum = 0;
@@ -1961,6 +1976,19 @@
                 acc[projectKey] += sp;
                 return acc;
             }, {});
+
+            const selectedProjectEntries = Object.entries(selectedProjectStats)
+                .map(([id, storyPoints]) => ({ id, name: id, storyPoints }))
+                .sort((a, b) => {
+                    const order = (key) => {
+                        if (key === 'PRODUCT') return 0;
+                        if (key === 'TECH') return 1;
+                        return 99;
+                    };
+                    const diff = order(a.id) - order(b.id);
+                    if (diff !== 0) return diff;
+                    return a.name.localeCompare(b.name);
+                });
 
             const teamCapacityStats = capacityTasks.reduce((acc, task) => {
                 const status = normalizeStatus(task.fields.status?.name);
@@ -2098,6 +2126,10 @@
                 return buildTeamStatusLink({ teamId, teamIds, projectName, projectNames, statuses: ['To Do', 'Pending'] });
             };
 
+            const buildAcceptedLink = ({ teamId, teamIds, projectName, projectNames }) => {
+                return buildTeamStatusLink({ teamId, teamIds, projectName, projectNames, statuses: ['Accepted'] });
+            };
+
             const hasStoryPoints = (task) => {
                 const sp = task.fields.customfield_10004;
                 if (sp === null || sp === undefined || sp === '') {
@@ -2161,49 +2193,15 @@
                 return () => window.removeEventListener('resize', updateOffset);
             }, [showPlanning, selectedCount, selectedSP, teamCapacityEntries.length]);
 
-            const exportToExcel = async () => {
-                try {
-                    // Collect selected tasks data
-                    const selectedTasksData = visibleTasks
-                        .filter(task => selectedTasks[task.key])
-                        .map(task => ({
-                            key: task.key,
-                            summary: task.fields.summary,
-                            storyPoints: task.fields.customfield_10004 || 0
-                        }));
-
-                    if (selectedTasksData.length === 0) {
-                        alert('No tasks selected');
-                        return;
-                    }
-
-                    // Send request to backend
-                    const response = await fetch(`${BACKEND_URL}/api/export-excel`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ tasks: selectedTasksData })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Export failed: ${response.status}`);
-                    }
-
-                    // Download the file
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `sprint_tasks_${new Date().toISOString().split('T')[0]}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                } catch (err) {
-                    console.error('Export error:', err);
-                    alert(`Failed to export: ${err.message}`);
-                }
+            const openSelectedInJira = () => {
+                if (!jiraUrl) return;
+                const keys = capacityTasks
+                    .filter(task => selectedTasks[task.key])
+                    .map(task => task.key)
+                    .sort();
+                if (keys.length === 0) return;
+                const jql = encodeURIComponent(`key in (${keys.join(', ')})`);
+                window.open(`${jiraUrl}/issues/?jql=${jql}`, '_blank', 'noopener,noreferrer');
             };
 
             return (
@@ -2292,7 +2290,7 @@
                         <div className="capacity-panel">
                             <div className="capacity-header">
                                 <div className="capacity-title">Planned Teams Effort (Story Points)</div>
-                                <div className="capacity-subtitle">1 SP ≈ 2 weeks of work · To Do / Postponed / Accepted</div>
+                                <div className="capacity-subtitle">1 SP ≈ 2 days of work</div>
                             </div>
                             <div className="capacity-grid-wrapper">
                                 <div className="capacity-grid">
@@ -2356,9 +2354,23 @@
                                                 </div>
                                             </div>
                                             <div className="capacity-cell metric product-col divider-right">
-                                                <span className={getMetricClass(info.product.accepted, 'accepted')}>
-                                                    {formatCapacityValue(info.product.accepted)}
-                                                </span>
+                                                <div className="postponed-cell">
+                                                    <span className={getMetricClass(info.product.accepted, 'accepted')}>
+                                                        {formatCapacityValue(info.product.accepted)}
+                                                    </span>
+                                                    {buildAcceptedLink({ teamId: info.id, projectName: 'PRODUCT ROADMAPS' }) && (
+                                                        <a
+                                                            className="accepted-link"
+                                                            href={buildAcceptedLink({ teamId: info.id, projectName: 'PRODUCT ROADMAPS' })}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title="View accepted tasks for this team in Jira"
+                                                            aria-label="Open accepted tasks in Jira"
+                                                        >
+                                                            ↗
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="capacity-cell metric tech-col">
@@ -2400,9 +2412,23 @@
                                                 </div>
                                             </div>
                                             <div className="capacity-cell metric tech-col divider-right">
-                                                <span className={getMetricClass(info.tech.accepted, 'accepted')}>
-                                                    {formatCapacityValue(info.tech.accepted)}
-                                                </span>
+                                                <div className="postponed-cell">
+                                                    <span className={getMetricClass(info.tech.accepted, 'accepted')}>
+                                                        {formatCapacityValue(info.tech.accepted)}
+                                                    </span>
+                                                    {buildAcceptedLink({ teamId: info.id, projectName: 'TECHNICAL ROADMAP' }) && (
+                                                        <a
+                                                            className="accepted-link"
+                                                            href={buildAcceptedLink({ teamId: info.id, projectName: 'TECHNICAL ROADMAP' })}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title="View accepted tasks for this team in Jira"
+                                                            aria-label="Open accepted tasks in Jira"
+                                                        >
+                                                            ↗
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="capacity-cell metric total-col">
@@ -2444,9 +2470,23 @@
                                                 </div>
                                             </div>
                                             <div className="capacity-cell metric total-col divider-right">
-                                                <span className={getMetricClass(info.total.accepted, 'accepted')}>
-                                                    {formatCapacityValue(info.total.accepted)}
-                                                </span>
+                                                <div className="postponed-cell">
+                                                    <span className={getMetricClass(info.total.accepted, 'accepted')}>
+                                                        {formatCapacityValue(info.total.accepted)}
+                                                    </span>
+                                                    {buildAcceptedLink({ teamId: info.id, projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'] }) && (
+                                                        <a
+                                                            className="accepted-link"
+                                                            href={buildAcceptedLink({ teamId: info.id, projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'] })}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title="View accepted tasks for this team in Jira"
+                                                            aria-label="Open accepted tasks in Jira"
+                                                        >
+                                                            ↗
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -2492,9 +2532,23 @@
                                             </div>
                                         </div>
                                         <div className="capacity-cell metric product-col divider-right capacity-total">
-                                            <span className={getMetricClass(capacityTotals.product.accepted, 'accepted')}>
-                                                {formatCapacityValue(capacityTotals.product.accepted)}
-                                            </span>
+                                            <div className="postponed-cell">
+                                                <span className={getMetricClass(capacityTotals.product.accepted, 'accepted')}>
+                                                    {formatCapacityValue(capacityTotals.product.accepted)}
+                                                </span>
+                                                {buildAcceptedLink({ teamIds: capacityTeamIds, projectName: 'PRODUCT ROADMAPS' }) && (
+                                                    <a
+                                                        className="accepted-link"
+                                                        href={buildAcceptedLink({ teamIds: capacityTeamIds, projectName: 'PRODUCT ROADMAPS' })}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="View accepted tasks for selected teams in Jira"
+                                                        aria-label="Open accepted tasks in Jira"
+                                                    >
+                                                        ↗
+                                                    </a>
+                                                )}
+                                            </div>
                                             </div>
 
                                         <div className="capacity-cell metric tech-col capacity-total">
@@ -2536,9 +2590,23 @@
                                             </div>
                                         </div>
                                         <div className="capacity-cell metric tech-col divider-right capacity-total">
-                                            <span className={getMetricClass(capacityTotals.tech.accepted, 'accepted')}>
-                                                {formatCapacityValue(capacityTotals.tech.accepted)}
-                                            </span>
+                                            <div className="postponed-cell">
+                                                <span className={getMetricClass(capacityTotals.tech.accepted, 'accepted')}>
+                                                    {formatCapacityValue(capacityTotals.tech.accepted)}
+                                                </span>
+                                                {buildAcceptedLink({ teamIds: capacityTeamIds, projectName: 'TECHNICAL ROADMAP' }) && (
+                                                    <a
+                                                        className="accepted-link"
+                                                        href={buildAcceptedLink({ teamIds: capacityTeamIds, projectName: 'TECHNICAL ROADMAP' })}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="View accepted tasks for selected teams in Jira"
+                                                        aria-label="Open accepted tasks in Jira"
+                                                    >
+                                                        ↗
+                                                    </a>
+                                                )}
+                                            </div>
                                             </div>
 
                                         <div className="capacity-cell metric total-col capacity-total">
@@ -2580,9 +2648,23 @@
                                             </div>
                                         </div>
                                             <div className="capacity-cell metric total-col divider-right capacity-total">
-                                                <span className={getMetricClass(capacityTotals.total.accepted, 'accepted')}>
-                                                    {formatCapacityValue(capacityTotals.total.accepted)}
-                                                </span>
+                                                <div className="postponed-cell">
+                                                    <span className={getMetricClass(capacityTotals.total.accepted, 'accepted')}>
+                                                        {formatCapacityValue(capacityTotals.total.accepted)}
+                                                    </span>
+                                                    {buildAcceptedLink({ teamIds: capacityTeamIds, projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'] }) && (
+                                                        <a
+                                                            className="accepted-link"
+                                                            href={buildAcceptedLink({ teamIds: capacityTeamIds, projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'] })}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title="View accepted tasks for selected teams in Jira"
+                                                            aria-label="Open accepted tasks in Jira"
+                                                        >
+                                                            ↗
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -2597,72 +2679,94 @@
                         </div>
                     )}
 
-                    <div ref={planningPanelRef} className={`planning-panel ${showPlanning ? 'open' : ''}`}>
-                        <div className="planning-stats">
-                            <div className="planning-stat">
-                                <span className="planning-stat-label">Selected Tasks:</span>
-                                <span className="planning-stat-value">{selectedCount}</span>
-                            </div>
-                            <div className="planning-stat">
-                                <span className="planning-stat-label">Sum SP:</span>
-                                <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
-                            </div>
-                            <button
-                                className="uncheck-button"
-                                onClick={clearSelectedTasks}
-                                disabled={selectedCount === 0}
-                                title="Clear all selected tasks"
-                            >
-                                Uncheck Selected
-                            </button>
-                            <button
-                                className="excel-button"
-                                onClick={exportToExcel}
-                                disabled={selectedCount === 0}
-                                title="Export to Excel"
-                            >
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13h-2v2h2v-2zm0-4h-2v2h2v-2zm0-4h-2v2h2v-2zM13 9V3.5L18.5 9H13z"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="planning-stats compact" style={{ marginTop: '0.4rem' }}>
-                            <div className="planning-stat">
-                                <span className="planning-stat-label">Selected SP by Team:</span>
-                            </div>
-                        </div>
-                        <div className="team-stats-grid">
-                            {selectedTeamEntries.map((info) => (
-                                <div key={info.id} className="team-stat-card">
-                                    <div className="team-stat-value">{info.storyPoints.toFixed(1)}</div>
-                                    <div className="team-stat-label">{info.name}</div>
-                                </div>
-                            ))}
-                            {selectedTeamEntries.length === 0 && (
-                                <div className="planning-stat">
-                                    <span className="planning-stat-value">No tasks selected</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="planning-stats compact" style={{ marginTop: '0.35rem' }}>
-                            <div className="planning-stat">
-                                <span className="planning-stat-label">Selected SP by Project:</span>
-                            </div>
-                            {Object.entries(selectedProjectStats).map(([projectKey, sp], index, arr) => (
-                                <div key={projectKey} className="planning-stat">
-                                    <span className="planning-stat-label">{projectKey}:</span>
-                                    <span className="planning-stat-value">{sp.toFixed(1)}</span>
-                                    {index < arr.length - 1 && <span className="planning-stat-separator">•</span>}
-                                </div>
-                            ))}
-                            {Object.keys(selectedProjectStats).length > 0 && (
-                                <div className="planning-stat">
-                                    <span className="planning-stat-label">Total:</span>
-                                    <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+	                    <div ref={planningPanelRef} className={`planning-panel ${showPlanning ? 'open' : ''}`}>
+	                        <div className="planning-stats">
+	                            <div className="planning-stat">
+	                                <span className="planning-stat-label">Selected Tasks:</span>
+	                                <span className="planning-stat-value">{selectedCount}</span>
+	                            </div>
+	                            <div className="planning-stat">
+	                                <span className="planning-stat-label">Total:</span>
+	                                <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
+	                            </div>
+	                            <button
+	                                className="planning-action-button"
+	                                onClick={() => selectPlanningTasksByStatus(['Accepted'])}
+	                                disabled={visibleTasks.length === 0}
+	                                title="Select all Accepted stories for the current view"
+	                            >
+	                                Select Accepted
+	                            </button>
+	                            <button
+	                                className="planning-action-button"
+	                                onClick={() => selectPlanningTasksByStatus(['To Do', 'Pending'])}
+	                                disabled={visibleTasks.length === 0}
+	                                title="Select all To Do / Pending stories for the current view"
+	                            >
+	                                Select To Do
+	                            </button>
+	                            <button
+	                                className="uncheck-button"
+	                                onClick={clearSelectedTasks}
+	                                disabled={selectedCount === 0}
+	                                title="Clear all selected tasks"
+	                            >
+	                                Uncheck Selected
+	                            </button>
+	                            <button
+	                                className="planning-action-button"
+	                                onClick={openSelectedInJira}
+	                                disabled={selectedCount === 0 || !jiraUrl}
+	                                title="Open selected stories in Jira (tip: bulk move them to Accepted)"
+	                            >
+	                                Open in Jira
+	                                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+	                                    <path d="M10 2h4v4h-1.5V4.56L8.53 8.53l-1.06-1.06L11.44 3.5H10V2z" />
+	                                    <path d="M13 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4v1.5H3.5v8h8V9H13z" />
+	                                </svg>
+	                            </button>
+	                        </div>
+	                        {selectedTeam === 'all' && (
+	                            <>
+	                                <div className="planning-stats compact" style={{ marginTop: '0.4rem' }}>
+	                                    <div className="planning-stat">
+	                                        <span className="planning-stat-label">Selected SP by Team:</span>
+	                                    </div>
+	                                </div>
+	                                <div className="team-stats-grid">
+	                                    {selectedTeamEntries.map((info) => (
+	                                        <div key={info.id} className="team-stat-card">
+	                                            <div className="team-stat-value">{info.storyPoints.toFixed(1)}</div>
+	                                            <div className="team-stat-label">{info.name}</div>
+	                                        </div>
+	                                    ))}
+	                                    {selectedTeamEntries.length === 0 && (
+	                                        <div className="planning-stat">
+	                                            <span className="planning-stat-value">No tasks selected</span>
+	                                        </div>
+	                                    )}
+	                                </div>
+	                            </>
+	                        )}
+	                        <div className="planning-stats compact" style={{ marginTop: '0.35rem' }}>
+	                            <div className="planning-stat">
+	                                <span className="planning-stat-label">Selected SP by Project:</span>
+	                            </div>
+	                        </div>
+	                        <div className="team-stats-grid">
+	                            {selectedProjectEntries.map((info) => (
+	                                <div key={info.id} className="team-stat-card">
+	                                    <div className="team-stat-value">{info.storyPoints.toFixed(1)}</div>
+	                                    <div className="team-stat-label">{info.name}</div>
+	                                </div>
+	                            ))}
+	                            {selectedProjectEntries.length === 0 && (
+	                                <div className="planning-stat">
+	                                    <span className="planning-stat-value">No tasks selected</span>
+	                                </div>
+	                            )}
+	                        </div>
+	                    </div>
 
                     {loading ? (
                         <div className="loading">Loading tasks...</div>
