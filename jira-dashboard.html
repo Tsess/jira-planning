@@ -1587,6 +1587,7 @@
 	            const savedPrefsRef = useRef(loadUiPrefs() || {});
 	            const [productTasks, setProductTasks] = useState([]);
 	            const [techTasks, setTechTasks] = useState([]);
+	            const [missingPlanningInfoTasks, setMissingPlanningInfoTasks] = useState([]);
 	            const [productEpicsInScope, setProductEpicsInScope] = useState([]);
 	            const [techEpicsInScope, setTechEpicsInScope] = useState([]);
 	            const [techLoaded, setTechLoaded] = useState(false);
@@ -1617,6 +1618,7 @@
 	            const [showNoEpicAlert, setShowNoEpicAlert] = useState(savedPrefsRef.current.showNoEpicAlert ?? true);
 	            const [showEmptyEpicAlert, setShowEmptyEpicAlert] = useState(savedPrefsRef.current.showEmptyEpicAlert ?? true);
 	            const [showDoneEpicAlert, setShowDoneEpicAlert] = useState(savedPrefsRef.current.showDoneEpicAlert ?? true);
+	            const [showMissingPlanningAlert, setShowMissingPlanningAlert] = useState(savedPrefsRef.current.showMissingPlanningAlert ?? true);
 	            const epicOrderRef = useRef({});
 	            const epicOrderCounterRef = useRef(0);
 
@@ -1656,7 +1658,8 @@
 	                    showBlockedAlert,
 	                    showNoEpicAlert,
 	                    showEmptyEpicAlert,
-	                    showDoneEpicAlert
+	                    showDoneEpicAlert,
+	                    showMissingPlanningAlert
 	                });
 	            }, [
 	                selectedSprint,
@@ -1672,7 +1675,8 @@
 	                showBlockedAlert,
 	                showNoEpicAlert,
 	                showEmptyEpicAlert,
-	                showDoneEpicAlert
+	                showDoneEpicAlert,
+	                showMissingPlanningAlert
 	            ]);
 
             const loadConfig = async () => {
@@ -1693,10 +1697,29 @@
 	                    setEpicDetails({});
 	                    setProductEpicsInScope([]);
 	                    setTechEpicsInScope([]);
+	                    setMissingPlanningInfoTasks([]);
 	                    loadProductTasks();
 	                    loadTechTasks();
+	                    fetchMissingPlanningInfo(selectedSprint);
 	                }
 	            }, [selectedSprint]);
+
+	            const fetchMissingPlanningInfo = async (sprintId) => {
+	                try {
+	                    if (!sprintId) return;
+	                    const params = new URLSearchParams({ sprint: String(sprintId), t: Date.now().toString() });
+	                    const response = await fetch(`${BACKEND_URL}/api/missing-info?${params.toString()}`, {
+	                        method: 'GET',
+	                        headers: { 'Content-Type': 'application/json' },
+	                        cache: 'no-cache'
+	                    });
+	                    if (!response.ok) return;
+	                    const data = await response.json();
+	                    setMissingPlanningInfoTasks(data.issues || []);
+	                } catch (e) {
+	                    // ignore (alerts are best-effort)
+	                }
+	            };
 
             useEffect(() => {
                 setTechLoaded(false);
@@ -2251,6 +2274,14 @@
                 if (!status) return false;
                 if (isExcludedStatus(status) || status === 'done') return false;
                 return !task.fields.epicKey;
+            });
+
+            const missingPlanningInfoVisible = missingPlanningInfoTasks.filter(task => {
+                const teamInfo = getTeamInfo(task);
+                if (selectedTeam !== 'all' && teamInfo.id !== selectedTeam) return false;
+                const status = normalizeStatus(task.fields.status?.name);
+                if (status === 'postponed' || status === 'killed' || status === 'done') return false;
+                return true;
             });
 
             const emptyEpics = epicsInScope
@@ -2912,7 +2943,7 @@
                         </div>
                     ) : (
                         <>
-	                            {(missingInfoTasks.length > 0 || blockedTasks.length > 0 || noEpicTasks.length > 0 || emptyEpics.length > 0 || doneStoryEpics.length > 0) && (
+	                            {(missingInfoTasks.length > 0 || blockedTasks.length > 0 || noEpicTasks.length > 0 || missingPlanningInfoVisible.length > 0 || emptyEpics.length > 0 || doneStoryEpics.length > 0) && (
 	                                <div className="alert-panels">
 	                                    {missingInfoTasks.length > 0 && (
 	                                        <div className="alert-card missing">
@@ -3272,6 +3303,74 @@
 	                                                                </a>
 	                                                            </div>
 	                                                        ))}
+	                                                    </div>
+	                                                </div>
+	                                            )}
+	                                        </div>
+	                                    )}
+
+	                                    {missingPlanningInfoVisible.length > 0 && (
+	                                        <div className="alert-card no-epic">
+	                                            <div className="alert-card-header">
+	                                                <button
+	                                                    className="alert-toggle"
+	                                                    onClick={() => setShowMissingPlanningAlert(prev => !prev)}
+	                                                    title="Collapse/expand missing info panel"
+	                                                >
+	                                                    <span className="alert-toggle-icon" aria-hidden="true">
+	                                                        <svg className={`alert-toggle-chevron ${showMissingPlanningAlert ? '' : 'collapsed'}`} viewBox="0 0 12 12">
+	                                                            <path d="M2.5 4.5l3.5 3 3.5-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+	                                                        </svg>
+	                                                    </span>
+	                                                    <span className="alert-toggle-label">
+	                                                        {showMissingPlanningAlert ? 'Hide' : 'Show'}
+	                                                    </span>
+	                                                </button>
+	                                                <div className="alert-title">🧾 Missing Planning Info</div>
+	                                                <div className="alert-subtitle">Some stories under planned epics are missing required fields—fill them in so planning doesn’t go blind.</div>
+	                                                <a
+	                                                    className="alert-chip"
+	                                                    href={buildKeyListLink(missingPlanningInfoVisible.map(t => t.key))}
+	                                                    target="_blank"
+	                                                    rel="noopener noreferrer"
+	                                                    title="Open these stories in Jira"
+	                                                >
+	                                                    {missingPlanningInfoVisible.length} {missingPlanningInfoVisible.length === 1 ? 'story' : 'stories'}
+	                                                </a>
+	                                            </div>
+	                                            {showMissingPlanningAlert && (
+	                                                <div className="alert-card-body">
+	                                                    <div className="alert-stories">
+	                                                        {missingPlanningInfoVisible.map(task => {
+	                                                            const teamInfo = getTeamInfo(task);
+	                                                            const missing = task.fields.missingFields || [];
+	                                                            return (
+	                                                                <div key={task.key} className="alert-story">
+	                                                                    <span className="alert-pill team">{teamInfo.name}</span>
+	                                                                    <div className="alert-story-main">
+	                                                                        <a
+	                                                                            className="alert-story-link"
+	                                                                            href={`${jiraUrl}/browse/${task.key}`}
+	                                                                            target="_blank"
+	                                                                            rel="noopener noreferrer"
+	                                                                        >
+	                                                                            {task.key} · {task.fields.summary}
+	                                                                        </a>
+	                                                                    </div>
+	                                                                    {missing.length > 0 && (
+	                                                                        <span className="alert-pill status">Missing: {missing.join(', ')}</span>
+	                                                                    )}
+	                                                                    <a
+	                                                                        className="alert-action"
+	                                                                        href={`${jiraUrl}/browse/${task.key}`}
+	                                                                        target="_blank"
+	                                                                        rel="noopener noreferrer"
+	                                                                    >
+	                                                                        Fix fields →
+	                                                                    </a>
+	                                                                </div>
+	                                                            );
+	                                                        })}
 	                                                    </div>
 	                                                </div>
 	                                            )}
