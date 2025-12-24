@@ -38,6 +38,8 @@ JIRA_TECH_PROJECT = os.getenv('JIRA_TECH_PROJECT', 'TECHNICAL ROADMAP')
 SERVER_PORT = int(os.getenv('SERVER_PORT', '5050'))
 EPIC_EMPTY_EXCLUDED_STATUSES = [s.strip() for s in os.getenv('EPIC_EMPTY_EXCLUDED_STATUSES', 'Killed,Done,Incomplete').split(',') if s.strip()]
 EPIC_EMPTY_TEAM_IDS = [s.strip() for s in os.getenv('EPIC_EMPTY_TEAM_IDS', '').split(',') if s.strip()]
+MISSING_INFO_COMPONENT = os.getenv('MISSING_INFO_COMPONENT', 'ATS - Bidswitch')
+MISSING_INFO_TEAM_IDS = [s.strip() for s in os.getenv('MISSING_INFO_TEAM_IDS', '').split(',') if s.strip()]
 
 # Cache settings
 SPRINTS_CACHE_FILE = 'sprints_cache.json'
@@ -363,7 +365,6 @@ def fetch_epic_details_bulk(epic_keys, headers, epic_name_field):
                     'summary': fields.get('summary'),
                     'reporter': (fields.get('reporter') or {}).get('displayName'),
                     'assignee': {'displayName': (fields.get('assignee') or {}).get('displayName')} if fields.get('assignee') else None,
-                    'epicName': fields.get(epic_field)
                 }
         except Exception as exc:
             print(f'⚠️ Epic batch fetch error: {exc}')
@@ -454,7 +455,6 @@ def fetch_epics_for_empty_alert(jql, headers, team_field_id, epic_name_field):
             'summary': fields.get('summary'),
             'status': {'name': status.get('name')} if status else None,
             'assignee': {'displayName': assignee.get('displayName')} if assignee else None,
-            'epicName': fields.get(epic_field),
             'team': team_value,
             'teamName': team_name,
             'teamId': team_value.get('id') if isinstance(team_value, dict) else None,
@@ -763,6 +763,218 @@ def fetch_tasks(include_team_name=False):
         })
         error_response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return error_response, 500
+
+
+def build_missing_info_scope_clause(team_ids, component_name):
+    clauses = []
+    component_name = (component_name or '').strip()
+    team_ids = [t.strip() for t in (team_ids or []) if t and str(t).strip()]
+
+    if component_name:
+        clauses.append(f'component = "{component_name}"')
+    if team_ids:
+        if len(team_ids) == 1:
+            clauses.append(f'"Team[Team]" = "{team_ids[0]}"')
+        else:
+            quoted = ', '.join(f'"{t}"' for t in team_ids)
+            clauses.append(f'"Team[Team]" in ({quoted})')
+
+    if not clauses:
+        return ''
+    if len(clauses) == 1:
+        return clauses[0]
+    return f"({ ' OR '.join(clauses) })"
+
+
+@app.route('/api/missing-info', methods=['GET'])
+def get_missing_info():
+    """Find stories under epics in a given sprint that are missing key planning fields (sprint/SP/team)."""
+    try:
+        sprint = request.args.get('sprint', '').strip()
+        if not sprint:
+            return jsonify({'error': 'Missing required query param: sprint'}), 400
+
+        # Prepare authorization
+        auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+        headers = {
+            'Authorization': f'Basic {auth_base64}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        # Resolve fields
+        team_field_id = resolve_team_field_id(headers)
+        epic_link_field_id = resolve_epic_link_field_id(headers)
+
+        scope_clause = build_missing_info_scope_clause(MISSING_INFO_TEAM_IDS, MISSING_INFO_COMPONENT)
+
+        # 1) Fetch epics that are in the sprint (future sprint planning), scoped by component/team.
+        epic_jql = f'Sprint = {sprint} AND issuetype = Epic'
+        if scope_clause:
+            epic_jql = add_clause_to_jql(epic_jql, scope_clause)
+        epic_jql = add_clause_to_jql(epic_jql, 'status not in ("Killed","Done","Incomplete")')
+        epic_jql = add_clause_to_jql(epic_jql, f'project in ("{JIRA_PRODUCT_PROJECT}","{JIRA_TECH_PROJECT}")')
+
+        epic_fields = ['summary', 'status', 'assignee', 'parent']
+        if team_field_id:
+            epic_fields.append(team_field_id)
+        if JIRA_TEAM_FALLBACK_FIELD_ID not in epic_fields:
+            epic_fields.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+        epics_resp = jira_search_request(headers, {
+            'jql': epic_jql,
+            'startAt': 0,
+            'maxResults': 250,
+            'fields': epic_fields
+        })
+        if epics_resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch epics for missing-info scan', 'details': epics_resp.text}), 502
+
+        epics_data = epics_resp.json() or {}
+        epic_issues = epics_data.get('issues', []) or []
+        epic_keys = [e.get('key') for e in epic_issues if e.get('key')]
+        if not epic_keys:
+            return jsonify({'issues': [], 'epics': [], 'count': 0})
+
+        # 2) Fetch stories under those epics, regardless of story sprint (to catch missing Sprint field).
+        story_fields = [
+            'summary',
+            'status',
+            'priority',
+            'issuetype',
+            'assignee',
+            'updated',
+            'customfield_10004',  # Story Points
+            'customfield_10101',  # Sprint
+            'parent'
+        ]
+        if epic_link_field_id and epic_link_field_id not in story_fields:
+            story_fields.append(epic_link_field_id)
+        if team_field_id and team_field_id not in story_fields:
+            story_fields.append(team_field_id)
+        if JIRA_TEAM_FALLBACK_FIELD_ID not in story_fields:
+            story_fields.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+        missing = []
+        batch_size = 40
+        for start in range(0, len(epic_keys), batch_size):
+            batch = epic_keys[start:start + batch_size]
+
+            link_clause = f'"Epic Link" in ({",".join(batch)})'
+            parent_clause = f'parent in ({",".join(batch)})'
+            # Important: do NOT scope stories by component/team here because the whole point is to
+            # find stories missing those fields. We only scope epics, then pull every story under them.
+            story_jql = f'({link_clause} OR {parent_clause}) AND issuetype = Story AND status not in (Killed, Done, Postponed)'
+
+            start_at = 0
+            while True:
+                resp = jira_search_request(headers, {
+                    'jql': story_jql,
+                    'startAt': start_at,
+                    'maxResults': 250,
+                    'fields': story_fields
+                })
+                if resp.status_code != 200:
+                    break
+
+                data = resp.json() or {}
+                issues = data.get('issues', []) or []
+                if not issues:
+                    break
+
+                for issue in issues:
+                    fields = issue.get('fields', {}) or {}
+                    status = (fields.get('status') or {}).get('name') or ''
+                    if str(status).strip().lower() == 'postponed':
+                        continue
+
+                    # team enrichment
+                    raw_team = None
+                    if fields.get(JIRA_TEAM_FALLBACK_FIELD_ID) is not None:
+                        raw_team = fields.get(JIRA_TEAM_FALLBACK_FIELD_ID)
+                    elif team_field_id and fields.get(team_field_id) is not None:
+                        raw_team = fields.get(team_field_id)
+                    if raw_team is not None:
+                        team_name = extract_team_name(raw_team)
+                        fields['team'] = build_team_value(raw_team)
+                        fields['teamName'] = team_name
+                        fields['teamId'] = fields['team'].get('id') if isinstance(fields['team'], dict) else None
+
+                    # epic link
+                    epic_key = None
+                    if epic_link_field_id and fields.get(epic_link_field_id):
+                        epic_key = fields.get(epic_link_field_id)
+                    elif fields.get('parent') and fields['parent'].get('key') and \
+                            fields['parent'].get('fields', {}).get('issuetype', {}).get('name', '').lower() == 'epic':
+                        epic_key = fields['parent'].get('key')
+                    if epic_key:
+                        fields['epicKey'] = epic_key
+
+                    sp = fields.get('customfield_10004')
+                    try:
+                        sp_num = float(sp) if sp not in (None, '', []) else 0.0
+                    except Exception:
+                        sp_num = 0.0
+                    has_sp = sp_num > 0
+
+                    sprint_value = fields.get('customfield_10101')
+                    has_sprint = bool(sprint_value)
+                    has_team = bool(fields.get('teamName'))
+
+                    missing_fields = []
+                    if not has_sprint:
+                        missing_fields.append('Sprint')
+                    if not has_sp:
+                        missing_fields.append('Story Points')
+                    if not has_team:
+                        missing_fields.append('Team')
+
+                    if not missing_fields:
+                        continue
+
+                    assignee = fields.get('assignee') or {}
+                    priority = fields.get('priority') or {}
+                    issuetype = fields.get('issuetype') or {}
+                    missing.append({
+                        'id': issue.get('id'),
+                        'key': issue.get('key'),
+                        'fields': {
+                            'summary': fields.get('summary'),
+                            'status': {'name': status} if status else None,
+                            'priority': {'name': priority.get('name')} if priority else None,
+                            'issuetype': {'name': issuetype.get('name')} if issuetype else None,
+                            'assignee': {'displayName': assignee.get('displayName')} if assignee else None,
+                            'updated': fields.get('updated'),
+                            'customfield_10004': fields.get('customfield_10004'),
+                            'customfield_10101': fields.get('customfield_10101'),
+                            'team': fields.get('team'),
+                            'teamName': fields.get('teamName'),
+                            'teamId': fields.get('teamId'),
+                            'epicKey': fields.get('epicKey'),
+                            'missingFields': missing_fields
+                        }
+                    })
+
+                start_at += len(issues)
+                total = data.get('total')
+                if total is not None and start_at >= total:
+                    break
+                if len(issues) < 250:
+                    break
+
+        response = jsonify({'issues': missing, 'count': len(missing), 'epicCount': len(epic_keys)})
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        print(f'❌ Missing-info error: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to compute missing-info', 'message': str(e)}), 500
 
 
 @app.route('/api/tasks', methods=['GET'])

@@ -16,6 +16,7 @@ Simple local dashboard to display Jira sprint tasks sorted by priority with Pyth
 - ✅ **Team-aware filtering** - Multi-team JQL plus UI dropdown to slice per team and see team name on each story
 - ✅ **Epic grouping** - Stories grouped under their epic with reporter details and per-team story lists
 - ✅ **Planning rollups** - Selected story points summarized per team, project, and overall
+- ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and “Epic Ready to Close” (rules: `ALERT_RULES.md`)
 
 ## 📋 Files
 
