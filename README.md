@@ -8,15 +8,15 @@ Simple local dashboard to display Jira sprint tasks sorted by priority with Pyth
 - ✅ **Smart Sprint Detection** - Auto-selects current quarter on load
 - ✅ **Intelligent Caching** - Sprint list cached for 24 hours to reduce Jira API load
 - ✅ **Sort by Priority** - Tasks sorted Highest → Lowest
-- ✅ **Filter by Status** - Show/hide Done, Killed, In Progress tasks
+- ✅ **Status filters** - Toggle Done/Killed and use stat cards (In Progress, To Do/Pending/Accepted, High Priority)
 - ✅ **Project Filtering** - Separate Tech and Product tasks
 - ✅ **Clean, Minimalist UI** - Beautiful typography with smooth animations
 - ✅ **Auto-refresh** - Reload button for tasks and sprints
 - ✅ **Secure Credentials** - All sensitive data in .env file
 - ✅ **Team-aware filtering** - Multi-team JQL plus UI dropdown to slice per team and see team name on each story
-- ✅ **Epic grouping** - Stories grouped under their epic with reporter details and per-team story lists
+- ✅ **Epic grouping** - Stories grouped under their epic with assignee and story-point totals
 - ✅ **Planning rollups** - Selected story points summarized per team, project, and overall
-- ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and “Epic Ready to Close” (rules: `ALERT_RULES.md`)
+- ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and “Epic Ready to Close” (rules: `ALERT_RULES.md`, ready-to-close uses all-time data)
 
 ## 📋 Files
 
@@ -177,6 +177,7 @@ Open `jira-dashboard.html` in your browser. Tasks will load automatically!
    - Filter toggles for Done/Killed/Tech/Product tasks
    - Click stat cards to filter by status
    - Refresh buttons for tasks and sprints
+   - Ready-to-close alert uses all-time story data (no sprint filter)
 
 ## 🎯 Sprint Selection
 
@@ -261,11 +262,11 @@ JQL_QUERY=project = PROJECT1 AND assignee = currentUser() ORDER BY priority DESC
 JQL_QUERY=project = PROJECT1 AND created >= -30d ORDER BY priority DESC
 ```
 
-**Note**: Don't include `Sprint = ID` in your JQL - the app adds it automatically based on dropdown selection!
+**Note**: Don't include `Sprint = ID` in your JQL - the app adds it automatically based on dropdown selection (ready-to-close ignores sprint filtering).
 
 ## 🔄 Updating data
 
-- **Tasks**: Click "Refresh" button at the bottom of the dashboard
+- **Tasks**: Click "Refresh Page" in the header (also refreshes ready-to-close data)
 - **Sprints**: Click "Refresh Sprints" button next to sprint dropdown
 - **Auto-reload**: Tasks reload automatically when you change sprint selection
 
@@ -291,8 +292,9 @@ The application uses intelligent caching to minimize Jira API load:
 - **Sprint list cached for 24 hours** - After first load, sprints load instantly
 - **Cache file**: `sprints_cache.json` (auto-generated, not committed to git)
 - **Manual refresh**: Use "Refresh Sprints" button or `?refresh=true` parameter
-- **Reduced API calls**: maxResults limited to 200 for optimal performance
-- **Timeout protection**: All requests have 30-second timeout
+- **Live task data**: Stories/epics are fetched fresh on each refresh (no cache)
+- **Reduced API calls**: Jira queries are capped (200 for sprint discovery, 250 for task fetches)
+- **Timeout protection**: Jira requests use 20–30 second timeouts
 
 ## 🤝 Contributing
 
@@ -304,4 +306,4 @@ MIT License - feel free to use this project however you'd like!
 
 ## 🙏 Credits
 
-Built with Flask, Python, and vanilla JavaScript.
+Built with Flask, Python, React (via CDN), and Babel, plus vanilla JavaScript.
