@@ -1587,9 +1587,13 @@
             const savedPrefsRef = useRef(loadUiPrefs() || {});
             const [productTasks, setProductTasks] = useState([]);
             const [techTasks, setTechTasks] = useState([]);
+            const [readyToCloseProductTasks, setReadyToCloseProductTasks] = useState([]);
+            const [readyToCloseTechTasks, setReadyToCloseTechTasks] = useState([]);
             const [missingPlanningInfoTasks, setMissingPlanningInfoTasks] = useState([]);
             const [productEpicsInScope, setProductEpicsInScope] = useState([]);
             const [techEpicsInScope, setTechEpicsInScope] = useState([]);
+            const [readyToCloseProductEpicsInScope, setReadyToCloseProductEpicsInScope] = useState([]);
+            const [readyToCloseTechEpicsInScope, setReadyToCloseTechEpicsInScope] = useState([]);
             const [techLoaded, setTechLoaded] = useState(false);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
@@ -1625,6 +1629,7 @@
                 loadConfig();
                 loadSprints();
             }, []);
+
 
             const normalizeStatus = (status) => {
                 return (status || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -1799,15 +1804,22 @@
                 return { id: teamId, name: teamName };
             };
 
-	            const fetchTasks = async (project) => {
-	                setLoading(true);
-	                setError('');
+	            const fetchTasks = async (project, options = {}) => {
+	                const useLoading = options.useLoading !== false;
+	                const setErrors = options.setErrorOnFailure !== false;
+	                if (useLoading) {
+	                    setLoading(true);
+	                }
+	                if (setErrors && options.clearError !== false) {
+	                    setError('');
+	                }
 
                 try {
+                    const sprintParam = options.sprintOverride !== undefined ? options.sprintOverride : (selectedSprint || '');
                     // Add cache busting parameter and sprint parameter
                     const params = new URLSearchParams({
                         t: Date.now().toString(),
-                        sprint: selectedSprint || '',
+                        sprint: sprintParam,
                         // always pull all teams; filtering happens client-side so capacity table can show every team
                         team: 'all',
                         project: project || 'all'
@@ -1841,20 +1853,29 @@
                         return priorityA - priorityB;
                     });
 
-	                    setEpicDetails(prev => ({ ...prev, ...(data.epics || {}) }));
-	                    if (project === 'product') {
-	                        setProductEpicsInScope(data.epicsInScope || []);
-	                    } else if (project === 'tech') {
-	                        setTechEpicsInScope(data.epicsInScope || []);
+	                    if (options.updateEpics !== false) {
+	                        setEpicDetails(prev => ({ ...prev, ...(data.epics || {}) }));
+	                        if (project === 'product') {
+	                            setProductEpicsInScope(data.epicsInScope || []);
+	                        } else if (project === 'tech') {
+	                            setTechEpicsInScope(data.epicsInScope || []);
+	                        }
+	                    }
+	                    if (options.epicsInScopeSetter) {
+	                        options.epicsInScopeSetter(data.epicsInScope || []);
 	                    }
 	                    return sortedTasks;
 	                } catch (err) {
-                    const errorMsg = `Failed to load tasks: ${err.message}. Make sure the Python server is running on ${BACKEND_URL}`;
-                    setError(errorMsg);
+                    if (setErrors) {
+                        const errorMsg = `Failed to load tasks: ${err.message}. Make sure the Python server is running on ${BACKEND_URL}`;
+                        setError(errorMsg);
+                    }
                     console.error('Full error details:', err);
                     return [];
                 } finally {
-                    setLoading(false);
+                    if (useLoading) {
+                        setLoading(false);
+                    }
                 }
             };
 
@@ -1869,8 +1890,36 @@
                 setTechLoaded(true);
             };
 
+	            const loadReadyToCloseProductTasks = async () => {
+	                const data = await fetchTasks('product', {
+	                    sprintOverride: '',
+	                    updateEpics: false,
+	                    epicsInScopeSetter: setReadyToCloseProductEpicsInScope,
+	                    useLoading: false,
+	                    setErrorOnFailure: false
+	                });
+	                setReadyToCloseProductTasks(data);
+	            };
+
+	            const loadReadyToCloseTechTasks = async () => {
+	                const data = await fetchTasks('tech', {
+	                    sprintOverride: '',
+	                    updateEpics: false,
+	                    epicsInScopeSetter: setReadyToCloseTechEpicsInScope,
+	                    useLoading: false,
+	                    setErrorOnFailure: false
+	                });
+	                setReadyToCloseTechTasks(data);
+	            };
+
+	            useEffect(() => {
+	                loadReadyToCloseProductTasks();
+	                loadReadyToCloseTechTasks();
+	            }, []);
+
 	            const tasks = showTech ? [...productTasks, ...techTasks] : [...productTasks];
 	            const capacityTasks = [...productTasks, ...techTasks];
+	            const readyToCloseTasks = [...readyToCloseProductTasks, ...readyToCloseTechTasks];
 	            const epicsInScope = React.useMemo(() => {
 	                const seen = new Set();
 	                const merged = [...productEpicsInScope, ...techEpicsInScope].filter(epic => {
@@ -1881,6 +1930,16 @@
 	                });
 	                return merged;
 	            }, [productEpicsInScope, techEpicsInScope]);
+	            const readyToCloseEpicsInScope = React.useMemo(() => {
+	                const seen = new Set();
+	                const merged = [...readyToCloseProductEpicsInScope, ...readyToCloseTechEpicsInScope].filter(epic => {
+	                    if (!epic?.key) return false;
+	                    if (seen.has(epic.key)) return false;
+	                    seen.add(epic.key);
+	                    return true;
+	                });
+	                return merged;
+	            }, [readyToCloseProductEpicsInScope, readyToCloseTechEpicsInScope]);
             const killedTasks = tasks.filter(t => t.fields.status?.name === 'Killed');
             const doneTasks = tasks.filter(t => t.fields.status?.name === 'Done');
             const techTasksCount = techTasks.length;
@@ -2321,7 +2380,8 @@
                 })
                 .filter(epic => typeof epic.totalStories === 'number' && epic.totalStories === 0);
 
-	            const doneStoryEpics = epicsInScope
+	            const readyToCloseStoryStatuses = new Set(['done', 'killed', 'incomplete']);
+	            const doneStoryEpics = readyToCloseEpicsInScope
 	                .filter(epic => {
 	                    const status = normalizeStatus(epic.status?.name);
 	                    if (status === 'killed' || status === 'done' || status === 'incomplete') return false;
@@ -2329,15 +2389,14 @@
 	                    return true;
 	                })
 	                .filter(epic => {
-	                    const epicStories = capacityTasks.filter(task => {
+	                    const epicStories = readyToCloseTasks.filter(task => {
 	                        if (!task.fields?.epicKey) return false;
 	                        if (task.fields.epicKey !== epic.key) return false;
 	                        if (selectedTeam !== 'all' && getTeamInfo(task).id !== selectedTeam) return false;
 	                        return true;
 	                    });
 	                    if (epicStories.length === 0) return false;
-	                    if (epicStories.some(task => normalizeStatus(task.fields.status?.name) === 'postponed')) return false;
-	                    return epicStories.every(task => normalizeStatus(task.fields.status?.name) === 'done');
+	                    return epicStories.every(task => readyToCloseStoryStatuses.has(normalizeStatus(task.fields.status?.name)));
 	                });
 
             const sortByPriorityThenSummary = (a, b) => {
@@ -2455,6 +2514,8 @@
                                 onClick={() => {
                                     loadProductTasks();
                                     loadTechTasks();
+                                    loadReadyToCloseProductTasks();
+                                    loadReadyToCloseTechTasks();
                                 }}
                                 disabled={loading || selectedSprint === null}
                                 title="Refresh tasks from Jira"
@@ -3200,7 +3261,7 @@
 	                                                    </span>
 	                                                </button>
 	                                                <div className="alert-title">✅ Epic Ready to Close</div>
-	                                                <div className="alert-subtitle">All stories are done, but the epic is still open—time to close the loop.</div>
+	                                                <div className="alert-subtitle">All stories are done, killed, or incomplete, but the epic is still open—time to close the loop.</div>
 	                                                <a
 	                                                    className="alert-chip"
 	                                                    href={buildKeyListLink(doneStoryEpics.map(e => e.key))}

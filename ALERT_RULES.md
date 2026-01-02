@@ -45,10 +45,9 @@ This doc describes the dashboard alert panels and the rules that trigger them. I
 
 ## ✅ Epic Ready to Close
 
-**Shows:** Epics where all stories in the current sprint are `Done`, but the epic itself is still open.
+**Shows:** Epics where all stories under the epic (no sprint filter) are `Done`, `Killed`, or `Incomplete`, but the epic itself is still open.
 
 **Rule:**
 - Epic status is **not** `Killed`, `Done`, or `Incomplete`
-- Epic has at least one story in the loaded sprint data
-- Every story under that epic in the current sprint data is `Done`
-
+- Epic has at least one story in the loaded all-time data (no sprint filter)
+- Every story under that epic in the loaded all-time data is `Done`, `Killed`, or `Incomplete`
