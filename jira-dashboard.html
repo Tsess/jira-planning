@@ -58,9 +58,9 @@
         }
 
         header {
-            margin-bottom: 2.5rem;
+            margin-bottom: 1.6rem;
             border-bottom: 1px solid var(--border);
-            padding-bottom: 1.5rem;
+            padding-bottom: 1.1rem;
         }
 
         h1 {
@@ -336,12 +336,12 @@
 	            display: grid;
 	            grid-template-columns: 1fr;
 	            gap: 1rem;
-	            margin: 1.5rem 0 1.75rem;
+	            margin: 1rem 0 1.2rem;
 	        }
 
         .alert-panels.collapsed {
             gap: 0.6rem;
-            margin: 0.85rem 0 1.1rem;
+            margin: 0.6rem 0 0.85rem;
         }
 
 	        .alert-card {
@@ -1152,20 +1152,24 @@
         }
 
         .planning-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            margin-top: 1rem;
-            margin-bottom: 1rem;
+            background: transparent;
+            border: 1px solid transparent;
+            margin-top: 0;
+            margin-bottom: 0;
             overflow: hidden;
             max-height: 0;
-            padding: 0 1rem;
+            padding: 0;
             opacity: 0;
-            transition: max-height 0.6s ease, opacity 0.6s ease, padding 0.6s ease;
+            transition: max-height 0.6s ease, opacity 0.6s ease, padding 0.6s ease, margin 0.6s ease, border-color 0.6s ease, background 0.6s ease;
         }
 
         .planning-panel.open {
+            background: var(--bg-secondary);
+            border-color: var(--border);
             max-height: 1600px;
             padding: 0.75rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
             opacity: 1;
             overflow: visible;
             position: sticky;
@@ -1177,8 +1181,8 @@
         .stats-panel {
             background: transparent;
             border: 1px solid transparent;
-            margin-top: 0.35rem;
-            margin-bottom: 0.35rem;
+            margin-top: 0;
+            margin-bottom: 0;
             overflow: hidden;
             max-height: 0;
             padding: 0;
@@ -1376,9 +1380,9 @@
 
         .priority-radar {
             width: 100%;
-            max-width: 620px;
+            max-width: 500px;
             height: auto;
-            margin: 0 auto 1rem;
+            margin: 0.2rem auto 0.6rem;
             display: block;
         }
 
@@ -1390,7 +1394,15 @@
             font-family: 'IBM Plex Mono', monospace;
             font-size: 0.7rem;
             color: var(--text-secondary);
-            margin-bottom: 0.9rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .priority-axis-note {
+            text-align: center;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.8rem;
         }
 
         .priority-legend span {
@@ -2730,6 +2742,7 @@
 
             const priorityRows = React.useMemo(() => {
                 const totals = {};
+                const pointsTotals = {};
                 (filteredStatsTeams || []).forEach(team => {
                     Object.entries(team.priorities || {}).forEach(([priorityName, counts]) => {
                         const label = getPriorityLabel(priorityName);
@@ -2740,6 +2753,10 @@
                         totals[label].incomplete += counts.incomplete || 0;
                         totals[label].killed += counts.killed || 0;
                     });
+                    Object.entries(team.priorityPoints || {}).forEach(([priorityName, points]) => {
+                        const label = getPriorityLabel(priorityName);
+                        pointsTotals[label] = (pointsTotals[label] || 0) + (points || 0);
+                    });
                 });
                 return Object.entries(totals)
                     .map(([name, counts]) => ({
@@ -2747,7 +2764,8 @@
                         done: counts.done,
                         incomplete: counts.incomplete,
                         killed: counts.killed,
-                        rate: computeRate(counts)
+                        rate: computeRate(counts),
+                        points: pointsTotals[name] || 0
                     }))
                     .sort((a, b) => {
                         const orderA = priorityOrder[a.name] || 999;
@@ -3087,7 +3105,7 @@
                 return 'metric-value';
             };
 
-            const buildTeamStatusLink = ({ teamId, teamIds, projectName, projectNames, statuses, excludeStatuses, priorityName }) => {
+            const buildTeamStatusLink = ({ teamId, teamIds, projectName, projectNames, statuses, excludeStatuses, priorityName, issueType }) => {
                 const ids = teamIds || (teamId ? [teamId] : []);
                 if (!jiraUrl || !ids.length) return '';
                 const clauses = [];
@@ -3121,6 +3139,9 @@
                 if (priorityName) {
                     clauses.push(`priority = "${priorityName}"`);
                 }
+                if (issueType) {
+                    clauses.push(`issuetype = "${issueType}"`);
+                }
                 const jql = encodeURIComponent(clauses.join(' AND '));
                 return `${jiraUrl}/issues/?jql=${jql}`;
             };
@@ -3136,7 +3157,8 @@
                     teamIds: priorityTeamIds,
                     statuses,
                     excludeStatuses,
-                    priorityName
+                    priorityName,
+                    issueType: 'Story'
                 });
             };
 
@@ -3964,32 +3986,38 @@
                                                 const totalDoneLink = buildStatLink(team.straight.done, {
                                                     teamId: team.id,
                                                     projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'],
-                                                    statuses: ['Done']
+                                                    statuses: ['Done'],
+                                                    issueType: 'Story'
                                                 });
                                                 const totalIncompleteLink = buildStatLink(team.straight.incomplete, {
                                                     teamId: team.id,
                                                     projectNames: ['PRODUCT ROADMAPS', 'TECHNICAL ROADMAP'],
-                                                    excludeStatuses: ['Done', 'Killed']
+                                                    excludeStatuses: ['Done', 'Killed'],
+                                                    issueType: 'Story'
                                                 });
                                                 const productDoneLink = buildStatLink(team.product.done, {
                                                     teamId: team.id,
                                                     projectName: 'PRODUCT ROADMAPS',
-                                                    statuses: ['Done']
+                                                    statuses: ['Done'],
+                                                    issueType: 'Story'
                                                 });
                                                 const productIncompleteLink = buildStatLink(team.product.incomplete, {
                                                     teamId: team.id,
                                                     projectName: 'PRODUCT ROADMAPS',
-                                                    excludeStatuses: ['Done', 'Killed']
+                                                    excludeStatuses: ['Done', 'Killed'],
+                                                    issueType: 'Story'
                                                 });
                                                 const techDoneLink = buildStatLink(team.tech.done, {
                                                     teamId: team.id,
                                                     projectName: 'TECHNICAL ROADMAP',
-                                                    statuses: ['Done']
+                                                    statuses: ['Done'],
+                                                    issueType: 'Story'
                                                 });
                                                 const techIncompleteLink = buildStatLink(team.tech.incomplete, {
                                                     teamId: team.id,
                                                     projectName: 'TECHNICAL ROADMAP',
-                                                    excludeStatuses: ['Done', 'Killed']
+                                                    excludeStatuses: ['Done', 'Killed'],
+                                                    issueType: 'Story'
                                                 });
 
                                                 return (
@@ -4169,6 +4197,20 @@
                                                             />
                                                         );
                                                     })}
+                                                    {[0.25, 0.5, 0.75, 1].map((ratio, index) => (
+                                                        <text
+                                                            key={`value-${index}`}
+                                                            x="0"
+                                                            y={-(120 * ratio) - 6}
+                                                            textAnchor="middle"
+                                                            dominantBaseline="middle"
+                                                            fontSize="8"
+                                                            fill="#8c8c8c"
+                                                            fontFamily="IBM Plex Mono, monospace"
+                                                        >
+                                                            {(priorityRadar.maxValue * ratio).toFixed(1)}
+                                                        </text>
+                                                    ))}
                                                     {priorityAxis.map((axis, index) => {
                                                         const angle = (Math.PI * 2 * index) / priorityAxis.length - Math.PI / 2;
                                                         const x = Math.cos(angle) * 150;
@@ -4180,7 +4222,7 @@
                                                                 y={y}
                                                                 textAnchor="middle"
                                                                 dominantBaseline="middle"
-                                                                fontSize="10"
+                                                                fontSize="8"
                                                                 fill="#555"
                                                                 fontFamily="IBM Plex Mono, monospace"
                                                             >
@@ -4207,12 +4249,14 @@
                                                     );
                                                 })}
                                             </div>
+                                            <div className="priority-axis-note">Axis values show story points.</div>
                                         </>
                                     )}
                                     <table className="stats-table">
                                         <thead>
                                             <tr>
                                                 <th className="dimension">Priority</th>
+                                                <th className="metric">Story Points</th>
                                                 <th className="metric">Done</th>
                                                 <th className="metric">Incomplete</th>
                                                 <th className="metric">Rate</th>
@@ -4220,6 +4264,9 @@
                                         </thead>
                                         <tbody>
                                             {priorityRows.map(row => {
+                                                const pointsLink = buildPriorityStatLink(row.points, {
+                                                    priorityName: row.name
+                                                });
                                                 const doneLink = buildPriorityStatLink(row.done, {
                                                     priorityName: row.name,
                                                     statuses: ['Done']
@@ -4232,6 +4279,23 @@
                                                 return (
                                                     <tr key={row.name}>
                                                         <td className="dimension">{row.name}</td>
+                                                        <td className="metric">
+                                                            <div className="postponed-cell">
+                                                                <span>{row.points.toFixed(1)}</span>
+                                                                {pointsLink && (
+                                                                    <a
+                                                                        className="stats-link"
+                                                                        href={pointsLink}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        title="View stories for this priority in Jira"
+                                                                        aria-label="Open stories in Jira"
+                                                                    >
+                                                                        ↗
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                         <td className="metric">
                                                             <div className="postponed-cell">
                                                                 <span>{row.done}</span>
