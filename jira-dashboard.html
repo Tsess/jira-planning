@@ -1949,6 +1949,11 @@
             white-space: nowrap;
         }
 
+        .project-card .team-stat-value {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
         .team-stat-line .team-stat-meta {
             margin-top: 0;
             white-space: nowrap;
@@ -2074,6 +2079,28 @@
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        .planning-stat-label[data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+
+        .planning-stat-label[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 0;
+            top: 1.2rem;
+            background: #111;
+            color: #fff;
+            font-size: 0.6rem;
+            line-height: 1.2;
+            padding: 0.35rem 0.45rem;
+            border-radius: 0.3rem;
+            white-space: normal;
+            width: max-content;
+            max-width: 220px;
+            z-index: 20;
         }
 
         .planning-stat-value {
@@ -3352,6 +3379,11 @@
                 acceptedTasks.every(task => selectedTasks[task.key]);
             const isTodoIncluded = todoPendingTasks.length > 0 &&
                 todoPendingTasks.every(task => selectedTasks[task.key]);
+
+            const selectedPlanningTasksList = selectedTasksList.filter(task => {
+                const epicKey = task.fields?.epicKey || 'NO_EPIC';
+                return !excludedEpicSet.has(epicKey);
+            });
             const selectedSP = selectedTasksList.reduce((sum, task) => {
                 const sp = parseFloat(task.fields.customfield_10004 || 0);
                 return sum + (Number.isNaN(sp) ? 0 : sp);
@@ -3367,8 +3399,8 @@
                 const underPercent = Math.max(0, (1 - ratio) * 100);
                 const status = ratio > 1.2 ? 'over' : ratio < 0.9 ? 'under' : '';
                 const suffix = ratio >= 1
-                    ? `${overPercent.toFixed(0)}% over planned`
-                    : `${underPercent.toFixed(0)}% under planned`;
+                    ? `${overPercent.toFixed(0)}% over`
+                    : `${underPercent.toFixed(0)}% under`;
                 const shortLabel = ratio >= 1
                     ? `${overPercent.toFixed(0)}% over`
                     : `${underPercent.toFixed(0)}% under`;
@@ -3381,7 +3413,7 @@
                         : '';
                 return {
                     label: shortLabel,
-                    text: `${selected.toFixed(1)} planned | ${capacity.toFixed(1)} capacity | ${suffix}`,
+                    text: `${selected.toFixed(1)} selected | ${capacity.toFixed(1)} capacity | ${suffix}`,
                     status,
                     title
                 };
@@ -3407,7 +3439,7 @@
             };
 
 
-            const selectedTeamStats = selectedTasksList.reduce((acc, task) => {
+            const selectedTeamStats = selectedPlanningTasksList.reduce((acc, task) => {
                 const teamInfo = getTeamInfo(task);
                 const sp = parseFloat(task.fields.customfield_10004 || 0);
                 if (!acc[teamInfo.id]) {
@@ -3417,13 +3449,24 @@
                 return acc;
             }, {});
 
-            const selectedProjectStats = selectedTasksList.reduce((acc, task) => {
-                const projectKey = task.key.split('-')[0];
+            const selectedProjectStats = selectedPlanningTasksList.reduce((acc, task) => {
+                const projectKey = task.key.startsWith('TECH-') ? 'TECH' : 'PRODUCT';
                 const sp = parseFloat(task.fields.customfield_10004 || 0);
                 if (!acc[projectKey]) {
                     acc[projectKey] = 0;
                 }
                 acc[projectKey] += sp;
+                return acc;
+            }, {});
+
+            const selectedTeamProjectStats = selectedPlanningTasksList.reduce((acc, task) => {
+                const teamInfo = getTeamInfo(task);
+                const bucket = task.key.startsWith('TECH-') ? 'tech' : 'product';
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                if (!acc[teamInfo.id]) {
+                    acc[teamInfo.id] = { product: 0, tech: 0 };
+                }
+                acc[teamInfo.id][bucket] += Number.isNaN(sp) ? 0 : sp;
                 return acc;
             }, {});
 
@@ -3544,12 +3587,28 @@
             const estimatedCapacityRaw = Math.max(0, totalCapacityBase - excludedCapacityTotal);
             const totalCapacityAdjusted = totalCapacityBase * capacityMultiplier;
             const estimatedCapacityAdjusted = estimatedCapacityRaw * capacityMultiplier;
+            const selectedPlanningSP = selectedPlanningTasksList.reduce((sum, task) => {
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                return sum + (Number.isNaN(sp) ? 0 : sp);
+            }, 0);
             const capacitySummary = getCapacityStatus(selectedSP, totalCapacityAdjusted);
 
-            const projectCapacity = {
-                PRODUCT: showProduct ? estimatedCapacityRaw * capacitySplit.product : 0,
-                TECH: showTech ? estimatedCapacityRaw * capacitySplit.tech : 0
-            };
+            const projectCapacity = displayedTeamOptions.reduce((acc, team) => {
+                const teamPlanningCapacity = getTeamNetCapacity(team);
+                if (!teamPlanningCapacity) return acc;
+                const stats = selectedTeamProjectStats[team.id] || { product: 0, tech: 0 };
+                const totalSelected = stats.product + stats.tech;
+                const techHeavy = totalSelected > 0 ? stats.tech >= stats.product : false;
+                const split = techHeavy ? { product: 0.2, tech: 0.8 } : capacitySplit;
+                acc.PRODUCT += teamPlanningCapacity * split.product;
+                acc.TECH += teamPlanningCapacity * split.tech;
+                return acc;
+            }, {
+                PRODUCT: 0,
+                TECH: 0
+            });
+            if (!showProduct) projectCapacity.PRODUCT = 0;
+            if (!showTech) projectCapacity.TECH = 0;
 
             const selectedProjectEntries = Object.entries(selectedProjectStats)
                 .map(([id, storyPoints]) => ({
@@ -4876,14 +4935,19 @@
 	                                <span className="planning-stat-value">{selectedCount}</span>
 	                            </div>
 	                            <div className="planning-stat">
-	                                <span className="planning-stat-label">Selected Effort:</span>
+                                    <span
+                                        className="planning-stat-label"
+                                        data-tooltip="Total selected story points."
+                                    >
+                                        Selected Effort:
+                                    </span>
 	                                <span className="planning-stat-value">{selectedSP.toFixed(1)}</span>
 	                            </div>
                                 {capacityEnabled && totalCapacityAdjusted > 0 && (
                                     <div className="planning-stat">
                                         <span
                                             className="planning-stat-label"
-                                            title="Total team capacity from the capacity project (before exclusions)."
+                                            data-tooltip="Estimated team capacity for the quarter (if one team selected, that team's capacity)."
                                         >
                                             Team Capacity:
                                         </span>
@@ -4896,7 +4960,7 @@
                                     <div className="planning-stat">
                                         <span
                                             className="planning-stat-label"
-                                            title="Team capacity minus reserved activities (excluded epic story points)."
+                                            data-tooltip="Team capacity minus excluded mandatory activities (perf review, dev lead management, etc.)."
                                         >
                                             Planning Capacity:
                                         </span>
@@ -4907,8 +4971,13 @@
                                 )}
                                 {capacityEnabled && totalCapacityAdjusted > 0 && (
                                     <div className="planning-stat">
-                                        <span className="planning-stat-label">Plan Variance:</span>
-                                        <span className={`planning-stat-value ${capacitySummary.status}`} title={capacitySummary.title}>
+                                        <span
+                                            className="planning-stat-label"
+                                            data-tooltip="Plan variance = (selected effort / team capacity - 1). Positive means over planned."
+                                        >
+                                            Plan Variance:
+                                        </span>
+                                        <span className={`planning-stat-value ${capacitySummary.status}`}>
                                             {capacitySummary.label || '0%'}
                                         </span>
                                     </div>
@@ -4997,7 +5066,7 @@
                                     <span className="planning-stat-label">Selected SP by Project:</span>
                                     {capacityEnabled && (
                                         <span className="planning-stat-separator">
-                                            Estimated capacity split: 70% Product / 30% Tech
+                                            Estimated capacity split: 70% Product / 30% Tech (tech-heavy teams may aim for 10% / 90%)
                                         </span>
                                     )}
                                 </div>
@@ -5006,22 +5075,19 @@
 	                                    {selectedProjectEntries.map((info) => (
 	                                        <div key={info.id} className="team-stat-card project-card">
 	                                            <div className="team-stat-label">{info.name}</div>
-	                                            <div className="team-stat-value">{info.storyPoints.toFixed(1)}</div>
-                                            {capacityEnabled && info.capacity > 0 && (
-                                                <div className="team-stat-meta">
-                                                    {(() => {
-                                                    const capacityMeta = getCapacityStatus(info.storyPoints, info.capacity);
-                                                    return (
-                                                        <span
-                                                            className={capacityMeta.status ? `planning-stat-value ${capacityMeta.status}` : ''}
-                                                            title={capacityMeta.title}
-                                                        >
-                                                            {capacityMeta.text}
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </div>
-                                        )}
+	                                            <div className="team-stat-line">
+	                                                <div className="team-stat-value">
+	                                                    {(() => {
+	                                                        const total = selectedProjectEntries.reduce((sum, entry) => sum + entry.storyPoints, 0);
+	                                                        const pct = total > 0 ? (info.storyPoints / total) * 100 : 0;
+	                                                        return `${pct.toFixed(0)}%`;
+	                                                    })()}
+	                                                </div>
+	                                            </div>
+	                                            <div className="team-stat-line">
+	                                                <div className="team-stat-value muted">{info.storyPoints.toFixed(1)} SP</div>
+	                                                <div className="team-stat-meta">Selected effort</div>
+	                                            </div>
 	                                </div>
 	                            ))}
 	                            {selectedProjectEntries.length === 0 && (
