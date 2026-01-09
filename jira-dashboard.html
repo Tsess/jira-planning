@@ -954,6 +954,49 @@
             box-shadow: 0 1px 0 var(--border);
         }
 
+        .epic-flash {
+            animation: epicFlash 1.1s ease;
+        }
+
+        @keyframes epicFlash {
+            0% { background: rgba(255, 255, 0, 0.45); }
+            100% { background: transparent; }
+        }
+
+        .epic-excluded {
+            opacity: 0.55;
+            transition: opacity 0.2s ease;
+        }
+
+        .clickable-number {
+            cursor: pointer;
+        }
+
+        .clickable-number:hover {
+            text-decoration: underline;
+        }
+
+        .back-to-top {
+            position: fixed;
+            right: 1.25rem;
+            bottom: 1.25rem;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-secondary);
+            padding: 0.45rem 0.7rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            box-shadow: 0 6px 16px var(--shadow);
+            z-index: 20;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .back-to-top:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
         .epic-title {
             font-size: 1.1rem;
             display: flex;
@@ -1884,7 +1927,7 @@
             justify-content: flex-start;
             font-family: 'IBM Plex Mono', monospace;
             flex-wrap: wrap;
-            overflow-x: hidden;
+            overflow: visible;
         }
 
         .planning-stats.compact {
@@ -2090,7 +2133,7 @@
             content: attr(data-tooltip);
             position: absolute;
             left: 0;
-            top: 1.2rem;
+            top: 1.1rem;
             background: #111;
             color: #fff;
             font-size: 0.6rem;
@@ -2101,6 +2144,16 @@
             width: max-content;
             max-width: 220px;
             z-index: 20;
+            text-transform: none;
+            letter-spacing: normal;
+            pointer-events: none;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .planning-stat-note {
+            margin-top: 0.2rem;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
         }
 
         .planning-stat-value {
@@ -2291,6 +2344,7 @@
             const [showDoneEpicAlert, setShowDoneEpicAlert] = useState(savedPrefsRef.current.showDoneEpicAlert ?? true);
             const epicOrderRef = useRef({});
             const epicOrderCounterRef = useRef(0);
+            const epicRefMap = useRef(new Map());
 
             useEffect(() => {
                 // Load config and sprints on component mount
@@ -3469,6 +3523,18 @@
                 return acc;
             }, {});
 
+            const excludedProjectStats = selectedTasksList.reduce((acc, task) => {
+                const epicKey = task.fields?.epicKey || 'NO_EPIC';
+                if (!excludedEpicSet.has(epicKey)) return acc;
+                const projectKey = task.key.startsWith('TECH-') ? 'TECH' : 'PRODUCT';
+                const sp = parseFloat(task.fields.customfield_10004 || 0);
+                if (!acc[projectKey]) {
+                    acc[projectKey] = 0;
+                }
+                acc[projectKey] += Number.isNaN(sp) ? 0 : sp;
+                return acc;
+            }, {});
+
             const capacitySplit = { product: 0.7, tech: 0.3 };
             const capacityMultiplier = showProduct && showTech
                 ? 1
@@ -3586,7 +3652,24 @@
             const estimatedCapacityRaw = Math.max(0, totalCapacityBase - excludedCapacityTotal);
             const totalCapacityAdjusted = totalCapacityBase * capacityMultiplier;
             const estimatedCapacityAdjusted = estimatedCapacityRaw * capacityMultiplier;
+            const excludedCapacityAdjusted = excludedCapacityTotal * capacityMultiplier;
             const capacitySummary = getCapacityStatus(selectedSP, totalCapacityAdjusted);
+            const scrollToFirstExcludedEpic = (projectType = 'any') => {
+                const firstExcluded = epicGroups.find((epic) => {
+                    if (!excludedEpicSet.has(epic.key)) return false;
+                    if (projectType === 'any') return true;
+                    const hasTech = (epic.tasks || []).some(task => String(task.key || '').startsWith('TECH-'));
+                    const hasProduct = (epic.tasks || []).some(task => !String(task.key || '').startsWith('TECH-'));
+                    return projectType === 'tech' ? hasTech : hasProduct;
+                });
+                if (!firstExcluded) return;
+                const node = epicRefMap.current.get(firstExcluded.key);
+                if (!node) return;
+                node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                node.classList.remove('epic-flash');
+                void node.offsetWidth;
+                node.classList.add('epic-flash');
+            };
 
             const projectCapacity = displayedTeamOptions.reduce((acc, team) => {
                 const teamPlanningCapacity = getTeamNetCapacity(team);
@@ -4959,8 +5042,16 @@
                                         >
                                             Planning Capacity:
                                         </span>
-                                        <span className="planning-stat-value">
+                                        <span className="planning-stat-value clickable-number" onClick={() => scrollToFirstExcludedEpic('any')}>
                                             {estimatedCapacityAdjusted.toFixed(1)} SP
+                                        </span>
+                                    </div>
+                                )}
+                                {capacityEnabled && excludedCapacityAdjusted > 0 && (
+                                    <div className="planning-stat">
+                                        <span className="planning-stat-label">Excluded Capacity:</span>
+                                        <span className="planning-stat-value clickable-number" onClick={() => scrollToFirstExcludedEpic('any')}>
+                                            {excludedCapacityAdjusted.toFixed(1)} SP
                                         </span>
                                     </div>
                                 )}
@@ -5059,16 +5150,16 @@
 	                        <div className="planning-stats compact" style={{ marginTop: '0.35rem' }}>
                                 <div className="planning-stat">
                                     <span className="planning-stat-label">Selected SP by Project:</span>
-                                    {capacityEnabled && (
-                                        <span className="planning-stat-separator">
-                                            Estimated capacity split: 70% Product / 30% Tech (tech-heavy teams may aim for 10% / 90%)
-                                        </span>
-                                    )}
                                 </div>
+                                {capacityEnabled && (
+                                    <div className="planning-stat-note">
+                                        Planning capacity split: 70% Product / 30% Tech (tech-heavy teams may aim for 10% / 90%). Selected effort excludes excluded epics.
+                                    </div>
+                                )}
 	                        </div>
-	                                <div className="team-stats-grid">
-	                                    {selectedProjectEntries.map((info) => (
-	                                        <div key={info.id} className="team-stat-card project-card">
+                        <div className="team-stats-grid">
+                            {selectedProjectEntries.map((info) => (
+                                <div key={info.id} className="team-stat-card project-card">
 	                                            <div className="team-stat-label">{info.name}</div>
 	                                            <div className="team-stat-line">
 	                                                <div className="team-stat-value">
@@ -5083,15 +5174,29 @@
 	                                                <div className="team-stat-value muted">{info.storyPoints.toFixed(1)} SP</div>
 	                                                <div className="team-stat-meta">Selected effort</div>
 	                                            </div>
+                                                {excludedProjectStats[info.id] > 0 && (
+                                                    <div className="team-stat-line">
+                                                        <div
+                                                            className="team-stat-value muted clickable-number"
+                                                            onClick={() => scrollToFirstExcludedEpic(info.id === 'TECH' ? 'tech' : 'product')}
+                                                        >
+                                                            {excludedProjectStats[info.id].toFixed(1)} SP
+                                                        </div>
+                                                        <div className="team-stat-meta">Excluded effort</div>
+                                                    </div>
+                                                )}
 	                                </div>
 	                            ))}
-	                            {selectedProjectEntries.length === 0 && (
-	                                <div className="planning-stat">
-	                                    <span className="planning-stat-value">No tasks selected</span>
-	                                </div>
-	                            )}
-	                        </div>
-	                    </div>
+                            {selectedProjectEntries.length === 0 && (
+                                <div className="planning-stat">
+                                    <span className="planning-stat-value">No tasks selected</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <button className="back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        Back to top
+                    </button>
 
                     {loading ? (
                         <div className="loading">Loading tasks...</div>
@@ -5501,7 +5606,14 @@
                                         const epicTotalSp = epicGroup.storyPoints || 0;
 
                                         return (
-                                            <div key={epicGroup.key} className="epic-block">
+                                            <div
+                                                key={epicGroup.key}
+                                                className={`epic-block ${excludedEpicSet.has(epicGroup.key) ? 'epic-excluded' : ''}`}
+                                                ref={(node) => {
+                                                    if (!node) return;
+                                                    epicRefMap.current.set(epicGroup.key, node);
+                                                }}
+                                            >
 	                                                <div className="epic-header">
                                                         <div className="epic-title">
 	                                                        <div className="epic-title-row">
