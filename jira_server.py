@@ -1032,6 +1032,256 @@ def fetch_tasks(include_team_name=False):
         return error_response, 500
 
 
+def fetch_issues_by_keys(keys, headers, fields_list):
+    """Fetch issues by keys in batches."""
+    if not keys:
+        return []
+
+    results = []
+    batch_size = 100
+    for i in range(0, len(keys), batch_size):
+        batch = keys[i:i + batch_size]
+        jql = f'key in ({",".join(batch)})'
+        payload = {
+            'jql': jql,
+            'startAt': 0,
+            'maxResults': batch_size,
+            'fields': fields_list
+        }
+        response = jira_search_request(headers, payload)
+        if response.status_code != 200:
+            print(f'❌ Dependencies fetch error: {response.status_code} {response.text}')
+            continue
+        data = response.json() or {}
+        results.extend(data.get('issues', []) or [])
+    return results
+
+
+def build_issue_snapshot(issue, team_field_id=None, epic_link_field_id=None):
+    """Build a compact issue snapshot for dependency rendering."""
+    fields = issue.get('fields', {}) or {}
+    raw_team = None
+    if fields.get(JIRA_TEAM_FALLBACK_FIELD_ID) is not None:
+        raw_team = fields.get(JIRA_TEAM_FALLBACK_FIELD_ID)
+    elif team_field_id and fields.get(team_field_id) is not None:
+        raw_team = fields.get(team_field_id)
+
+    team_name = None
+    team_id = None
+    if raw_team is not None:
+        team_name = extract_team_name(raw_team)
+        team_value = build_team_value(raw_team)
+        if isinstance(team_value, dict):
+            team_id = team_value.get('id')
+
+    epic_key = None
+    if epic_link_field_id and fields.get(epic_link_field_id):
+        epic_key = fields.get(epic_link_field_id)
+    elif fields.get('parent') and fields['parent'].get('key') and \
+            fields['parent'].get('fields', {}).get('issuetype', {}).get('name', '').lower() == 'epic':
+        epic_key = fields['parent'].get('key')
+
+    return {
+        'key': issue.get('key'),
+        'summary': fields.get('summary'),
+        'issuetype': fields.get('issuetype', {}).get('name') if fields.get('issuetype') else None,
+        'status': fields.get('status', {}).get('name') if fields.get('status') else None,
+        'storyPoints': fields.get('customfield_10004'),
+        'teamName': team_name,
+        'teamId': team_id,
+        'epicKey': epic_key
+    }
+
+
+@app.route('/api/dependencies', methods=['POST'])
+def get_dependencies():
+    """Fetch dependency links for a set of issues."""
+    try:
+        payload = request.get_json(silent=True) or {}
+        keys = payload.get('keys') or []
+        if not keys:
+            return jsonify({'dependencies': {}})
+
+        keys = sorted({str(k).strip() for k in keys if str(k).strip()})
+        if not keys:
+            return jsonify({'dependencies': {}})
+
+        auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+        headers = {
+            'Authorization': f'Basic {auth_base64}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        team_field_id = resolve_team_field_id(headers)
+        epic_link_field_id = resolve_epic_link_field_id(headers)
+
+        fields_list = [
+            'summary',
+            'status',
+            'issuetype',
+            'customfield_10004',
+            'parent',
+            'issuelinks'
+        ]
+        if epic_link_field_id and epic_link_field_id not in fields_list:
+            fields_list.append(epic_link_field_id)
+        if team_field_id and team_field_id not in fields_list:
+            fields_list.append(team_field_id)
+        if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
+            fields_list.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+        issues = fetch_issues_by_keys(keys, headers, fields_list)
+        issue_map = {}
+        linked_keys = set()
+        for issue in issues:
+            snapshot = build_issue_snapshot(issue, team_field_id, epic_link_field_id)
+            if snapshot.get('key'):
+                issue_map[snapshot['key']] = snapshot
+            for link in issue.get('fields', {}).get('issuelinks', []) or []:
+                linked = link.get('outwardIssue') or link.get('inwardIssue')
+                if linked and linked.get('key'):
+                    linked_keys.add(linked['key'])
+
+        missing_linked = sorted(linked_keys - set(issue_map.keys()))
+        if missing_linked:
+            linked_issues = fetch_issues_by_keys(missing_linked, headers, fields_list)
+            for issue in linked_issues:
+                snapshot = build_issue_snapshot(issue, team_field_id, epic_link_field_id)
+                if snapshot.get('key'):
+                    issue_map[snapshot['key']] = snapshot
+
+        dependencies = {}
+        for issue in issues:
+            base_key = issue.get('key')
+            if not base_key:
+                continue
+            links = issue.get('fields', {}).get('issuelinks', []) or []
+            entries = []
+            for link in links:
+                linked_issue = link.get('outwardIssue')
+                direction = 'outward'
+                relation = link.get('type', {}).get('outward')
+                if linked_issue is None:
+                    linked_issue = link.get('inwardIssue')
+                    direction = 'inward'
+                    relation = link.get('type', {}).get('inward')
+                if not linked_issue or not linked_issue.get('key'):
+                    continue
+                relation_lower = str(relation or '').lower()
+                category = None
+                if 'depend' in relation_lower:
+                    category = 'dependency'
+                elif 'block' in relation_lower:
+                    category = 'block'
+                if category is None:
+                    continue
+                linked_key = linked_issue.get('key')
+                linked_snapshot = issue_map.get(linked_key)
+                if not linked_snapshot:
+                    linked_snapshot = {
+                        'key': linked_key,
+                        'summary': linked_issue.get('fields', {}).get('summary'),
+                        'issuetype': linked_issue.get('fields', {}).get('issuetype', {}).get('name'),
+                        'status': linked_issue.get('fields', {}).get('status', {}).get('name'),
+                        'storyPoints': linked_issue.get('fields', {}).get('customfield_10004'),
+                        'teamName': None,
+                        'teamId': None,
+                        'epicKey': None
+                    }
+                entries.append({
+                    **linked_snapshot,
+                    'direction': direction,
+                    'relation': relation or link.get('type', {}).get('name'),
+                    'category': category
+                })
+            if entries:
+                dependencies[base_key] = entries
+
+        return jsonify({'dependencies': dependencies})
+    except Exception as e:
+        print(f'❌ Dependencies error: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch dependencies', 'message': str(e)}), 500
+
+
+@app.route('/api/issues/lookup', methods=['GET'])
+def lookup_issues():
+    """Lookup issues by key/id for dependency popovers."""
+    try:
+        keys_param = request.args.get('keys', '') or ''
+        ids_param = request.args.get('ids', '') or ''
+        keys = [k.strip() for k in keys_param.split(',') if k.strip()]
+        ids = [i.strip() for i in ids_param.split(',') if i.strip()]
+        if not keys and not ids:
+            return jsonify({'issues': []})
+
+        auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+        headers = {
+            'Authorization': f'Basic {auth_base64}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        team_field_id = resolve_team_field_id(headers)
+        epic_link_field_id = resolve_epic_link_field_id(headers)
+
+        fields_list = [
+            'summary',
+            'status',
+            'issuetype',
+            'customfield_10004',
+            'parent'
+        ]
+        if epic_link_field_id and epic_link_field_id not in fields_list:
+            fields_list.append(epic_link_field_id)
+        if team_field_id and team_field_id not in fields_list:
+            fields_list.append(team_field_id)
+        if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
+            fields_list.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+        issues = []
+        if keys:
+            unique_keys = sorted({str(k).strip() for k in keys if str(k).strip()})
+            issues.extend(fetch_issues_by_keys(unique_keys, headers, fields_list))
+
+        if ids:
+            unique_ids = sorted({str(i).strip() for i in ids if str(i).strip()})
+            jql = f'id in ({",".join(unique_ids)})'
+            payload = {
+                'jql': jql,
+                'startAt': 0,
+                'maxResults': len(unique_ids),
+                'fields': fields_list
+            }
+            response = jira_search_request(headers, payload)
+            if response.status_code == 200:
+                data = response.json() or {}
+                issues.extend(data.get('issues', []) or [])
+            else:
+                print(f'❌ Lookup fetch error: {response.status_code} {response.text}')
+
+        snapshots = []
+        for issue in issues:
+            snapshot = build_issue_snapshot(issue, team_field_id, epic_link_field_id)
+            snapshot['id'] = issue.get('id')
+            snapshots.append(snapshot)
+
+        return jsonify({'issues': snapshots})
+    except Exception as e:
+        print(f'❌ Issue lookup error: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to lookup issues', 'message': str(e)}), 500
+
+
 def fetch_stats_for_sprint(sprint_name, headers, team_field_id, team_ids=None):
     """Fetch stories for a sprint and aggregate delivery stats by team/project."""
     base_jql = STATS_JQL_BASE or f'project in ("{JIRA_PRODUCT_PROJECT}","{JIRA_TECH_PROJECT}")'
@@ -1964,6 +2214,8 @@ if __name__ == '__main__':
     print('\n📋 Endpoints:')
     print(f'   • http://localhost:{SERVER_PORT}/api/tasks - Get sprint tasks')
     print(f'   • http://localhost:{SERVER_PORT}/api/tasks-with-team-name - Get sprint tasks with team names')
+    print(f'   • http://localhost:{SERVER_PORT}/api/dependencies - Get issue dependencies (POST)')
+    print(f'   • http://localhost:{SERVER_PORT}/api/issues/lookup?keys=KEY-1,KEY-2 - Lookup issues (GET)')
     print(f'   • http://localhost:{SERVER_PORT}/api/stats?sprint=2025Q3 - Get completed sprint stats (cached)')
     print(f'   • http://localhost:{SERVER_PORT}/api/stats-example - Get example completed sprint stats')
     print(f'   • http://localhost:{SERVER_PORT}/api/sprints - Get available sprints (cached)')

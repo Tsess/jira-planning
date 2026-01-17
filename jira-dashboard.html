@@ -779,8 +779,9 @@
             border-left: 4px solid var(--border);
             padding: 1.25rem 1.5rem;
             margin-bottom: 0.9rem;
-            transition: all 0.3s;
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.14s ease, background-color 0.14s ease, outline 0.14s ease, outline-offset 0.14s ease;
             animation: slideUp 0.6s ease-out both;
+            position: relative;
         }
 
         .task-item:nth-child(1) { animation-delay: 0.7s; }
@@ -1032,7 +1033,126 @@
             margin-bottom: 1.1rem;
             background: var(--bg-secondary);
             padding: 0.75rem;
+            position: relative;
         }
+
+        .dependency-strip {
+            margin-top: 0.55rem;
+            padding-top: 0.45rem;
+            border-top: 1px dashed var(--border);
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 0.65rem;
+            align-items: center;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.65rem;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .dependency-count {
+            border: 1px solid var(--border);
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            font-size: 0.55rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            background: #f4f5f7;
+            cursor: pointer;
+        }
+
+        .dependency-count.active {
+            background: #111;
+            color: #fff;
+            border-color: #111;
+        }
+
+        .focus-mode .task-item {
+            transition: opacity 160ms ease, background 160ms ease, outline 160ms ease;
+        }
+
+        .focus-mode .task-item.is-dimmed {
+            opacity: 0.18;
+            pointer-events: none;
+        }
+
+        .task-item.is-focused {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .task-item.is-upstream {
+            background: rgba(239, 68, 68, 0.06);
+        }
+
+        .task-item.is-downstream {
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .task-header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.35rem;
+        }
+
+        .dependency-pill-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+
+        .dependency-pill {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.1rem 0.35rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            background: #f4f5f7;
+        }
+
+        .dependency-pill.blocked {
+            color: #b91c1c;
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .dependency-pill.blocker {
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .dependency-missing {
+            margin-top: 0.45rem;
+            padding-top: 0.35rem;
+            border-top: 1px dashed var(--border);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        .dependency-missing-label {
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.55rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .dependency-missing-item {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+
 
         .epic-header {
             display: flex;
@@ -1808,10 +1928,11 @@
         .capacity-panel.open {
             background: var(--bg-secondary);
             border-color: var(--border);
-            padding: 0.6rem 0.75rem;
-            margin: 0 0 1rem;
-            max-height: 1400px;
+            padding: 0.75rem;
+            margin: 1rem 0;
+            max-height: 1600px;
             opacity: 1;
+            overflow: visible;
             box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
         }
 
@@ -2399,6 +2520,8 @@
             const savedPrefsRef = useRef(loadUiPrefs() || {});
             const [productTasks, setProductTasks] = useState([]);
             const [techTasks, setTechTasks] = useState([]);
+            const [loadedProductTasks, setLoadedProductTasks] = useState([]);
+            const [loadedTechTasks, setLoadedTechTasks] = useState([]);
             const [readyToCloseProductTasks, setReadyToCloseProductTasks] = useState([]);
             const [readyToCloseTechTasks, setReadyToCloseTechTasks] = useState([]);
             const [missingPlanningInfoTasks, setMissingPlanningInfoTasks] = useState([]);
@@ -2425,6 +2548,7 @@
             });
             const [showPlanning, setShowPlanning] = useState(savedPrefsRef.current.showPlanning ?? false);
             const [showStats, setShowStats] = useState(savedPrefsRef.current.showStats ?? false);
+            const [showDependencies, setShowDependencies] = useState(savedPrefsRef.current.showDependencies ?? false);
             const [searchQuery, setSearchQuery] = useState(savedPrefsRef.current.searchQuery ?? '');
             const normalizeSelectedTeams = (value) => {
                 if (Array.isArray(value)) {
@@ -2454,6 +2578,10 @@
             const [capacityEnabled, setCapacityEnabled] = useState(false);
             const [capacityByTeam, setCapacityByTeam] = useState({});
             const [capacityLoading, setCapacityLoading] = useState(false);
+            const [dependencyData, setDependencyData] = useState({});
+            const [dependencyFocus, setDependencyFocus] = useState(null);
+            const [dependencyLookupCache, setDependencyLookupCache] = useState({});
+            const [dependencyLookupLoading, setDependencyLookupLoading] = useState(false);
             const [excludedStatsEpics, setExcludedStatsEpics] = useState(savedPrefsRef.current.excludedStatsEpics ?? []);
             const [showMissingAlert, setShowMissingAlert] = useState(savedPrefsRef.current.showMissingAlert ?? true);
             const [showBlockedAlert, setShowBlockedAlert] = useState(savedPrefsRef.current.showBlockedAlert ?? true);
@@ -2473,6 +2601,7 @@
             const normalizeStatus = (status) => {
                 return (status || '').toLowerCase().replace(/\s+/g, ' ').trim();
             };
+
 
             useEffect(() => {
                 if (!showPlanning) {
@@ -2547,6 +2676,7 @@
                     selectedTeams,
                     showPlanning,
                     showStats,
+                    showDependencies,
                     showTech,
                     showProduct,
                     showDone,
@@ -2566,6 +2696,7 @@
                 selectedTeams,
                 showPlanning,
                 showStats,
+                showDependencies,
                 showTech,
                 showProduct,
                 showDone,
@@ -2761,6 +2892,17 @@
                 return { id: teamId, name: teamName };
             };
 
+            const groupTasksByTeam = (tasks) => {
+                const groups = new Map();
+                (tasks || []).forEach(task => {
+                    const teamName = getTeamInfo(task).name;
+                    const items = groups.get(teamName) || [];
+                    items.push(task);
+                    groups.set(teamName, items);
+                });
+                return Array.from(groups.entries()).map(([teamName, items]) => ({ teamName, items }));
+            };
+
 	            const fetchTasks = async (project, options = {}) => {
 	                const useLoading = options.useLoading !== false;
 	                const setErrors = options.setErrorOnFailure !== false;
@@ -2839,12 +2981,36 @@
             const loadProductTasks = async () => {
                 const data = await fetchTasks('product');
                 setProductTasks(data);
+                setLoadedProductTasks(data);
             };
 
             const loadTechTasks = async () => {
                 const data = await fetchTasks('tech');
                 setTechTasks(data);
+                setLoadedTechTasks(data);
                 setTechLoaded(true);
+            };
+
+            const fetchDependencies = async (keys) => {
+                if (!keys.length) {
+                    setDependencyData({});
+                    return;
+                }
+                try {
+                    const response = await fetch(`${BACKEND_URL}/api/dependencies`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ keys })
+                    });
+                    if (!response.ok) {
+                        console.error('Dependencies fetch failed:', response.status);
+                        return;
+                    }
+                    const data = await response.json();
+                    setDependencyData(data.dependencies || {});
+                } catch (err) {
+                    console.error('Dependencies fetch error:', err);
+                }
             };
 
 	            const loadReadyToCloseProductTasks = async () => {
@@ -2868,6 +3034,7 @@
 	                });
 	                setReadyToCloseTechTasks(data);
 	            };
+
 
             useEffect(() => {
                 loadReadyToCloseProductTasks();
@@ -3440,6 +3607,48 @@
             const epicGroups = Object.values(groupTasksByEpic(visibleTasks))
                 .sort((a, b) => (epicOrderRef.current[a.key] ?? 999999) - (epicOrderRef.current[b.key] ?? 999999));
 
+            const dependencyTasks = React.useMemo(
+                () => [...loadedProductTasks, ...loadedTechTasks],
+                [loadedProductTasks, loadedTechTasks]
+            );
+            const dependencyKeySignature = React.useMemo(() => {
+                const keys = Array.from(new Set(dependencyTasks.map(task => task.key).filter(Boolean)));
+                return keys.sort().join('|');
+            }, [dependencyTasks]);
+
+            useEffect(() => {
+                if (!showDependencies && !showBlockedAlert) {
+                    setDependencyData({});
+                    return;
+                }
+                if (!dependencyKeySignature) {
+                    setDependencyData({});
+                    return;
+                }
+                const keys = dependencyKeySignature.split('|').filter(Boolean);
+                fetchDependencies(keys);
+            }, [showDependencies, showBlockedAlert, dependencyKeySignature]);
+
+            useEffect(() => {
+                if (!showDependencies) {
+                    setDependencyFocus(null);
+                }
+            }, [showDependencies]);
+
+            const issueByKey = React.useMemo(() => {
+                const map = new Map();
+                dependencyTasks.forEach(task => {
+                    if (task.key) {
+                        map.set(task.key, task);
+                    }
+                });
+                return map;
+            }, [dependencyTasks]);
+
+            const focusRelatedSet = React.useMemo(() => {
+                return new Set(dependencyFocus?.relatedKeys || []);
+            }, [dependencyFocus]);
+
             const highPriorityCount = baseFilteredTasks.filter(t => {
                 const priority = t.fields.priority?.name;
                 return priority === 'Blocker' || priority === 'Highest' ||
@@ -3488,10 +3697,109 @@
                 return status === 'To Do' || status === 'Pending' || status === 'Accepted';
             }));
 
-            const removeTask = (taskKey) => {
+            const removeTask = (task) => {
+                const taskKey = task?.key;
+                if (!taskKey) return;
                 setProductTasks(prev => prev.filter(t => t.key !== taskKey));
                 setTechTasks(prev => prev.filter(t => t.key !== taskKey));
             };
+
+            const getDependencyKeys = React.useCallback((taskKey, action) => {
+                if (!taskKey) return [];
+                const entries = (dependencyData[taskKey] || [])
+                    .filter(dep => dep.key && dep.category === 'dependency');
+                const direction = action === 'dependents' ? 'inward' : 'outward';
+                const seen = new Set();
+                return entries
+                    .filter(dep => dep.direction === direction)
+                    .filter(dep => {
+                        const key = `${dep.key}-${dep.direction}`;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    })
+                    .map(dep => dep.key)
+                    .filter(Boolean);
+            }, [dependencyData]);
+
+            const handleDependencyFocusClick = (event) => {
+                const button = event.target.closest('button[data-dep-chip]');
+                if (button) {
+                    event.preventDefault();
+                    const taskKey = button.getAttribute('data-task-key');
+                    const action = button.getAttribute('data-dep-chip');
+                    if (!taskKey || !action) return;
+                    if (dependencyFocus && dependencyFocus.taskKey === taskKey && dependencyFocus.action === action) {
+                        setDependencyFocus(null);
+                        return;
+                    }
+                    const dependencyKeys = getDependencyKeys(taskKey, action);
+                    const relatedKeys = Array.from(new Set([taskKey, ...dependencyKeys]));
+                    const missingKeys = dependencyKeys.filter(key => !issueByKey.has(key));
+                    setDependencyFocus({
+                        taskKey,
+                        action,
+                        relatedKeys,
+                        missingKeys
+                    });
+                    return;
+                }
+                if (dependencyFocus && !event.target.closest('.task-item')) {
+                    setDependencyFocus(null);
+                }
+            };
+
+            useEffect(() => {
+                if (!dependencyFocus) return;
+                const handleKey = (event) => {
+                    if (event.key === 'Escape') {
+                        setDependencyFocus(null);
+                    }
+                };
+                window.addEventListener('keydown', handleKey);
+                return () => window.removeEventListener('keydown', handleKey);
+            }, [dependencyFocus]);
+
+            useEffect(() => {
+                if (!dependencyFocus) return;
+                const missingKeys = (dependencyFocus.missingKeys || []).filter(key => !dependencyLookupCache[key]);
+                if (!missingKeys.length) return;
+                let isCancelled = false;
+                const fetchLookup = async () => {
+                    setDependencyLookupLoading(true);
+                    try {
+                        const response = await fetch(
+                            `${BACKEND_URL}/api/issues/lookup?keys=${encodeURIComponent(missingKeys.join(','))}`
+                        );
+                        if (!response.ok) {
+                            console.error('Dependency lookup failed:', response.status);
+                            return;
+                        }
+                        const data = await response.json();
+                        if (isCancelled) return;
+                        const issues = data.issues || [];
+                        setDependencyLookupCache(prev => {
+                            const next = { ...prev };
+                            issues.forEach(issue => {
+                                if (issue.key) {
+                                    next[issue.key] = issue;
+                                }
+                            });
+                            return next;
+                        });
+                    } catch (err) {
+                        console.error('Dependency lookup error:', err);
+                    } finally {
+                        if (!isCancelled) {
+                            setDependencyLookupLoading(false);
+                        }
+                    }
+                };
+                fetchLookup();
+                return () => {
+                    isCancelled = true;
+                };
+            }, [dependencyFocus, dependencyLookupCache]);
 
             const toggleTaskSelection = (taskKey) => {
                 setSelectedTasks(prev => {
@@ -5762,6 +6070,12 @@
                                 >
                                     {showProduct ? `Hide Product Tasks (${productTasksCount})` : `Show Product Tasks (${productTasksCount})`}
                                 </button>
+                                <button
+                                    className={`toggle ${showDependencies ? 'active' : ''}`}
+                                    onClick={() => setShowDependencies(!showDependencies)}
+                                >
+                                    {showDependencies ? 'Hide Dependencies' : 'Show Dependencies'}
+                                </button>
                                 {doneTasks.length > 0 && (
                                     <button
                                         className={`toggle ${showDone ? 'active' : ''}`}
@@ -5786,13 +6100,15 @@
                                     <p>There are no tasks matching the current criteria</p>
                                 </div>
                             ) : (
-                                <div className="task-list">
+                                <div
+                                    className={`task-list ${dependencyFocus ? 'focus-mode' : ''}`}
+                                    onClick={handleDependencyFocusClick}
+                                >
                                     {epicGroups.map(epicGroup => {
                                         const epicInfo = epicGroup.epic;
                                         const epicTitle = epicInfo?.summary || epicGroup.parentSummary ||
                                             (epicGroup.key === 'NO_EPIC' ? 'No Epic Linked' : epicGroup.key);
                                         const epicTotalSp = epicGroup.storyPoints || 0;
-
                                         return (
                                             <div
                                                 key={epicGroup.key}
@@ -5872,15 +6188,61 @@
                                                     const isKilled = task.fields.status?.name === 'Killed';
                                                     const isDone = task.fields.status?.name === 'Done';
                                                     const teamInfo = getTeamInfo(task);
+                                                    const rawDeps = showDependencies
+                                                        ? (dependencyData[task.key] || []).filter(dep => dep.key && dep.category === 'dependency')
+                                                        : [];
+                                                    const uniqueDeps = (() => {
+                                                        const seen = new Set();
+                                                        return rawDeps.filter(dep => {
+                                                            const key = `${dep.key}-${dep.direction}`;
+                                                            if (seen.has(key)) return false;
+                                                            seen.add(key);
+                                                            return true;
+                                                        });
+                                                    })();
+                                                    const dependsOnAll = uniqueDeps.filter(dep => dep.direction === 'outward');
+                                                    const dependentsAll = uniqueDeps.filter(dep => dep.direction === 'inward');
+                                                    const dependsOnIds = dependsOnAll.map(dep => dep.key).filter(Boolean);
+                                                    const dependentIds = dependentsAll.map(dep => dep.key).filter(Boolean);
+                                                    const hasDeps = dependsOnIds.length > 0 || dependentIds.length > 0;
+                                                    const hasCycle = dependsOnIds.some(id => dependentIds.includes(id) && issueByKey.has(id));
+                                                    const isDependsFocusActive = dependencyFocus &&
+                                                        dependencyFocus.taskKey === task.key &&
+                                                        dependencyFocus.action === 'depends-on';
+                                                    const isDependentsFocusActive = dependencyFocus &&
+                                                        dependencyFocus.taskKey === task.key &&
+                                                        dependencyFocus.action === 'dependents';
+                                                    const isFocusActive = !!dependencyFocus;
+                                                    const isRelated = !isFocusActive || focusRelatedSet.has(task.key);
+                                                    const isFocused = isFocusActive && dependencyFocus.taskKey === task.key;
+                                                    const isUpstream = isFocusActive && dependencyFocus.action === 'depends-on' && !isFocused && focusRelatedSet.has(task.key);
+                                                    const isDownstream = isFocusActive && dependencyFocus.action === 'dependents' && !isFocused && focusRelatedSet.has(task.key);
+                                                    const missingKeys = isFocused ? (dependencyFocus?.missingKeys || []) : [];
+                                                    const missingInfoByKey = {};
+                                                    uniqueDeps.forEach(dep => {
+                                                        if (dep.key) {
+                                                            missingInfoByKey[dep.key] = dep;
+                                                        }
+                                                    });
+                                                    const missingLines = missingKeys.map(key => {
+                                                        const lookup = dependencyLookupCache[key];
+                                                        const info = missingInfoByKey[key] || {};
+                                                        const status = lookup?.status || info.status || 'Unknown';
+                                                        const summary = lookup?.summary || info.summary || 'Unknown summary';
+                                                        const teamName = lookup?.teamName || info.teamName || 'Unknown team';
+                                                        return { key, status, summary, teamName };
+                                                    });
                                                     return (
                                                         <div
                                                             key={task.key}
-                                                            className={`task-item priority-${task.fields.priority?.name.toLowerCase()} ${isDone ? 'status-done' : ''} ${isKilled ? 'status-killed' : ''}`}
+                                                            className={`task-item priority-${task.fields.priority?.name.toLowerCase()} ${isDone ? 'status-done' : ''} ${isKilled ? 'status-killed' : ''} ${isFocusActive && !isRelated ? 'is-dimmed' : ''} ${isFocused ? 'is-focused' : ''} ${isUpstream ? 'is-upstream' : ''} ${isDownstream ? 'is-downstream' : ''}`}
+                                                            data-task-key={task.key}
+                                                            data-task-id={task.id || task.key}
                                                         >
                                                             <div className="task-header">
                                                                 <button
                                                                     className="task-remove"
-                                                                    onClick={() => removeTask(task.key)}
+                                                                    onClick={() => removeTask(task)}
                                                                     title="Remove task from view"
                                                                 >
                                                                     ×
@@ -5921,9 +6283,21 @@
                                                                         />
                                                                     )}
                                                                 </div>
-                                                                <span className={`task-priority ${task.fields.priority?.name.toLowerCase()}`}>
-                                                                    {task.fields.priority?.name || 'None'}
-                                                                </span>
+                                                                <div className="task-header-right">
+                                                                    <span className={`task-priority ${task.fields.priority?.name.toLowerCase()}`}>
+                                                                        {task.fields.priority?.name || 'None'}
+                                                                    </span>
+                                                                    {showDependencies && hasDeps && (
+                                                                        <div className="dependency-pill-stack">
+                                                                            {dependsOnIds.length > 0 && (
+                                                                                <span className="dependency-pill blocked">← BLOCKED BY</span>
+                                                                            )}
+                                                                            {dependentIds.length > 0 && (
+                                                                                <span className="dependency-pill blocker">BLOCKS →</span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             <div className="task-meta">
                                                                 <span className={`task-status ${task.fields.status?.name.toLowerCase().replace(/\s+/g, '-')}`}>
@@ -5947,6 +6321,47 @@
                                                                     </span>
                                                                 )}
                                                             </div>
+                                                            {showDependencies && hasDeps && (
+                                                                <div className="dependency-strip">
+                                                                    {dependsOnIds.length > 0 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`dependency-count ${isDependsFocusActive ? 'active' : ''}`}
+                                                                            data-dep-chip="depends-on"
+                                                                            data-task-id={task.id || task.key}
+                                                                            data-task-key={task.key}
+                                                                            aria-label={`Depends on ${dependsOnIds.length} tasks`}
+                                                                        >
+                                                                            DEPENDS ON {dependsOnIds.length}
+                                                                        </button>
+                                                                    )}
+                                                                    {dependentIds.length > 0 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`dependency-count ${isDependentsFocusActive ? 'active' : ''}`}
+                                                                            data-dep-chip="dependents"
+                                                                            data-task-id={task.id || task.key}
+                                                                            data-task-key={task.key}
+                                                                            aria-label={`Dependents ${dependentIds.length} tasks`}
+                                                                        >
+                                                                            DEPENDENTS {dependentIds.length}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {showDependencies && isFocused && missingLines.length > 0 && (
+                                                                <div className="dependency-missing">
+                                                                    <div className="dependency-missing-label">Not loaded</div>
+                                                                    {missingLines.map(item => (
+                                                                        <div className="dependency-missing-item" key={`missing-${item.key}`}>
+                                                                            {item.key} · {item.status} · {item.summary} · {item.teamName}
+                                                                        </div>
+                                                                    ))}
+                                                                    {dependencyLookupLoading && (
+                                                                        <div className="dependency-missing-item">Loading issue details...</div>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}

@@ -1,6 +1,5 @@
 # Monday TODO
 
-- Visualize and fetch dependencies between tasks; decide if a new panel is needed.
 - Groups selector: ability to create groups of teams to better alignment if the scope is wide.
 - Create a configuration of the env in the UI
 - Config: decide on frontend bundling path

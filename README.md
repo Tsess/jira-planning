@@ -15,6 +15,7 @@ Simple local dashboard to display Jira sprint tasks sorted by priority with Pyth
 - ✅ **Secure Credentials** - All sensitive data in .env file
 - ✅ **Team-aware filtering** - Multi-team JQL plus UI dropdown to slice per team and see team name on each story
 - ✅ **Epic grouping** - Stories grouped under their epic with assignee and story-point totals
+- ✅ **Dependency focus** - Click Depends On/Dependents to highlight related tasks and show missing deps inline
 - ✅ **Planning rollups** - Selected story points summarized per team, project, and overall
 - ✅ **Capacity planning** - Team capacity vs planning capacity (exclusions via epic toggle)
 - ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and “Epic Ready to Close” (rules: `ALERT_RULES.md`, ready-to-close uses all-time data)
@@ -148,6 +149,8 @@ You should see:
 📋 Endpoints:
    • http://localhost:<PORT>/api/tasks - Get sprint tasks
    • http://localhost:<PORT>/api/tasks-with-team-name - Get sprint tasks with a derived teamName field
+   • http://localhost:<PORT>/api/dependencies - Get issue dependencies (POST)
+   • http://localhost:<PORT>/api/issues/lookup?keys=KEY-1,KEY-2 - Lookup dependency issues (GET)
    • http://localhost:<PORT>/api/sprints - Get available sprints (cached)
    • http://localhost:<PORT>/api/sprints?refresh=true - Force refresh sprints cache
    • http://localhost:<PORT>/api/boards - Get all boards (to find board ID)
@@ -184,10 +187,18 @@ Open `jira-dashboard.html` in your browser. Tasks will load automatically!
    - Auto-selects current quarter on first load
    - Sorted by priority (Highest → Lowest)
    - Filter toggles for Done/Killed/Tech/Product tasks
+   - Dependency focus mode (chips highlight related tasks, missing deps shown inline)
    - Click stat cards to filter by status
    - Refresh buttons for tasks and sprints
    - Ready-to-close alert uses all-time story data (no sprint filter)
    - Statistics panel for active/closed sprints (derived from loaded sprint tasks)
+
+## 🔗 Dependencies
+
+- Click **Depends On** or **Dependents** on a story to enter focus mode (dims unrelated cards and highlights related ones).
+- Relationship direction is shown via right-side pills (“← BLOCKED BY” / “BLOCKS →”).
+- Missing dependencies (not in the current sprint load) are shown inline under the focused story.
+- Missing dependency details are fetched via `/api/issues/lookup` and cached client-side.
 
 ## 🎯 Sprint Selection
 
