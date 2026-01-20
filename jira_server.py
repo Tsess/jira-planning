@@ -90,6 +90,37 @@ def parse_iso_date(value):
         return None
 
 
+def resolve_sprint_label(sprint_value):
+    if sprint_value is None:
+        return None
+    sprint_str = str(sprint_value).strip()
+    if not sprint_str:
+        return None
+    if sprint_str.isdigit():
+        cache = load_sprints_cache() or {}
+        for sprint in cache.get('sprints', []) or []:
+            if str(sprint.get('id')) == sprint_str:
+                return sprint.get('name') or sprint_str
+    return sprint_str
+
+
+def quarter_dates_from_label(label):
+    if not label:
+        return None, None
+    match = re.match(r'^(\d{4})Q([1-4])$', str(label).strip(), re.IGNORECASE)
+    if not match:
+        return None, None
+    year = int(match.group(1))
+    quarter = int(match.group(2))
+    if quarter == 1:
+        return date(year, 1, 1), date(year, 3, 31)
+    if quarter == 2:
+        return date(year, 4, 1), date(year, 6, 30)
+    if quarter == 3:
+        return date(year, 7, 1), date(year, 9, 30)
+    return date(year, 10, 1), date(year, 12, 31)
+
+
 TEAM_FIELD_CACHE = None
 EPIC_LINK_FIELD_CACHE = None
 CAPACITY_FIELD_CACHE = None
@@ -351,6 +382,92 @@ def fetch_capacity_for_sprint(sprint_name, headers, debug=False, team_names=None
             'fieldId': capacity_field_id
         }
     return response_payload, None
+
+
+def fetch_watchers_count(issue_key, headers):
+    """Fetch watchers count for an issue (fallback if watches field is missing)."""
+    if not issue_key:
+        return None
+    try:
+        response = requests.get(
+            f'{JIRA_URL}/rest/api/3/issue/{issue_key}/watchers',
+            headers=headers,
+            timeout=20
+        )
+        if response.status_code != 200:
+            print(f'❌ Watchers fetch error for {issue_key}: {response.status_code} {response.text}')
+            return None
+        data = response.json() or {}
+        if isinstance(data.get('watchCount'), int):
+            return data['watchCount']
+        watchers = data.get('watchers') or []
+        return len(watchers)
+    except Exception as e:
+        print(f'❌ Watchers fetch exception for {issue_key}: {e}')
+        return None
+
+
+def fetch_capacity_team_sizes(sprint_name, headers, team_names=None):
+    """Fetch team sizes from Jira capacity issues (watchers count)."""
+    if not CAPACITY_PROJECT or not sprint_name:
+        return {}, {}
+
+    issues = []
+    jqls = []
+    chunk_size = 20
+    team_chunks = [team_names[i:i + chunk_size] for i in range(0, len(team_names or []), chunk_size)]
+    if not team_chunks:
+        team_chunks = [None]
+
+    for chunk in team_chunks:
+        jql = build_capacity_jql(sprint_name, chunk)
+        jqls.append(jql)
+        payload = {
+            'jql': jql,
+            'startAt': 0,
+            'maxResults': 200,
+            'fields': ['summary', 'watches']
+        }
+        response = jira_search_request(headers, payload)
+        if response.status_code != 200:
+            print(f'❌ Capacity size fetch error: {response.status_code} {response.text}')
+            continue
+        data = response.json() or {}
+        issues.extend(data.get('issues') or [])
+
+    sizes = {}
+    details = {}
+    pattern = re.compile(rf'^Team info\s+{re.escape(str(sprint_name))}\s*-\s*(.+)$', re.IGNORECASE)
+    for issue in issues:
+        fields = issue.get('fields') or {}
+        summary = str(fields.get('summary') or '').strip()
+        match = pattern.match(summary)
+        if not match:
+            continue
+        short_name = normalize_capacity_team_name(match.group(1))
+        if not short_name:
+            continue
+        watch_count = None
+        watches = fields.get('watches') or {}
+        if isinstance(watches, dict):
+            watch_count = watches.get('watchCount')
+        if watch_count is None:
+            watch_count = fetch_watchers_count(issue.get('key'), headers)
+        if watch_count is None:
+            continue
+        try:
+            count = int(watch_count)
+            sizes[short_name] = count
+            details[short_name] = {
+                'watchers': count,
+                'issue_key': issue.get('key')
+            }
+            if issue.get('key'):
+                print(f'🧭 Capacity size: {short_name} -> {issue.get("key")} watchers={count}')
+        except (TypeError, ValueError):
+            continue
+
+    return sizes, details
 
 
 # Cache helper functions
@@ -1154,6 +1271,7 @@ def build_issue_snapshot(issue, team_field_id=None, epic_link_field_id=None):
         'summary': fields.get('summary'),
         'issuetype': fields.get('issuetype', {}).get('name') if fields.get('issuetype') else None,
         'status': fields.get('status', {}).get('name') if fields.get('status') else None,
+        'priority': fields.get('priority', {}).get('name') if fields.get('priority') else None,
         'storyPoints': fields.get('customfield_10004'),
         'teamName': team_name,
         'teamId': team_id,
@@ -1167,12 +1285,42 @@ def collect_dependencies(keys, headers):
     if not keys:
         return {}
 
+    def normalize_link_text(value):
+        return str(value or '').strip().lower()
+
+    def has_block_marker(*values):
+        return any('block' in normalize_link_text(value) for value in values if value)
+
+    def has_depend_marker(*values):
+        return any('depend' in normalize_link_text(value) for value in values if value)
+
+    def resolve_link_direction(category, relation, direction, base_key, linked_key):
+        relation_text = normalize_link_text(relation)
+        if category == 'block':
+            base_blocks = 'block' in relation_text and 'blocked by' not in relation_text
+            base_blocked = 'blocked by' in relation_text
+            if base_blocks:
+                return base_key, linked_key
+            if base_blocked:
+                return linked_key, base_key
+            return (base_key, linked_key) if direction == 'outward' else (linked_key, base_key)
+        if category == 'dependency':
+            base_depends = 'depend' in relation_text and 'depended on' not in relation_text
+            base_depended = 'depended on' in relation_text
+            if base_depends:
+                return linked_key, base_key
+            if base_depended:
+                return base_key, linked_key
+            return (linked_key, base_key) if direction == 'outward' else (base_key, linked_key)
+        return None, None
+
     team_field_id = resolve_team_field_id(headers)
     epic_link_field_id = resolve_epic_link_field_id(headers)
 
     fields_list = [
         'summary',
         'status',
+        'priority',
         'issuetype',
         'customfield_10004',
         'parent',
@@ -1213,24 +1361,34 @@ def collect_dependencies(keys, headers):
         links = issue.get('fields', {}).get('issuelinks', []) or []
         entries = []
         for link in links:
+            type_info = link.get('type', {}) or {}
+            type_name = type_info.get('name')
+            type_inward = type_info.get('inward')
+            type_outward = type_info.get('outward')
             linked_issue = link.get('outwardIssue')
             direction = 'outward'
-            relation = link.get('type', {}).get('outward')
+            relation = type_outward
             if linked_issue is None:
                 linked_issue = link.get('inwardIssue')
                 direction = 'inward'
-                relation = link.get('type', {}).get('inward')
+                relation = type_inward
             if not linked_issue or not linked_issue.get('key'):
                 continue
-            relation_lower = str(relation or '').lower()
             category = None
-            if 'depend' in relation_lower:
-                category = 'dependency'
-            elif 'block' in relation_lower:
+            if has_block_marker(type_name, type_inward, type_outward):
                 category = 'block'
+            elif has_depend_marker(type_name, type_inward, type_outward):
+                category = 'dependency'
             if category is None:
                 continue
             linked_key = linked_issue.get('key')
+            prereq_key, dependent_key = resolve_link_direction(
+                category,
+                relation,
+                direction,
+                base_key,
+                linked_key
+            )
             linked_snapshot = issue_map.get(linked_key)
             if not linked_snapshot:
                 linked_snapshot = {
@@ -1246,8 +1404,13 @@ def collect_dependencies(keys, headers):
             entries.append({
                 **linked_snapshot,
                 'direction': direction,
-                'relation': relation or link.get('type', {}).get('name'),
-                'category': category
+                'relation': relation or type_name,
+                'category': category,
+                'typeName': type_name,
+                'typeInward': type_inward,
+                'typeOutward': type_outward,
+                'prereqKey': prereq_key,
+                'dependentKey': dependent_key
             })
         if entries:
             dependencies[base_key] = entries
@@ -1369,17 +1532,19 @@ def scenario_planner():
         config_payload = payload.get('config') or {}
         filters = payload.get('filters') or {}
 
-        start_date = parse_iso_date(config_payload.get('start_date')) or date.today()
-        quarter_end_date = parse_iso_date(config_payload.get('quarter_end_date')) or (start_date + timedelta(days=90))
+        sprint_label = resolve_sprint_label(filters.get('sprint'))
+        quarter_start, quarter_end = quarter_dates_from_label(sprint_label)
+        start_date = parse_iso_date(config_payload.get('start_date')) or quarter_start or date.today()
+        quarter_end_date = parse_iso_date(config_payload.get('quarter_end_date')) or quarter_end or (start_date + timedelta(days=90))
 
         scenario_config = ScenarioConfig(
             start_date=start_date,
             quarter_end_date=quarter_end_date,
-            sp_to_weeks=float(config_payload.get('sp_to_weeks', 2.0)),
-            team_sizes=config_payload.get('team_sizes') or {},
-            vacation_weeks=config_payload.get('vacation_weeks') or {},
-            sickleave_buffer=float(config_payload.get('sickleave_buffer', 0.1)),
-            wip_limit=int(config_payload.get('wip_limit', 1)),
+            sp_to_weeks=2.0,
+            team_sizes={},
+            vacation_weeks={},
+            sickleave_buffer=0.0,
+            wip_limit=1,
             lane_mode=config_payload.get('lane_mode', 'team'),
         )
 
@@ -1412,11 +1577,16 @@ def scenario_planner():
         if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
             fields_list.append(JIRA_TEAM_FALLBACK_FIELD_ID)
 
+        search_query = (filters.get('search') or '').strip().lower()
+        team_filter_ids = {t for t in (filters.get('teams') or []) if t}
         scenario_jql = build_scenario_jql(filters)
         issues_raw = fetch_issues_by_jql(scenario_jql, headers, fields_list)
 
         issues = []
         issue_keys = []
+        issue_by_key = {}
+        team_names = set()
+        epic_keys = set()
         for issue in issues_raw:
             fields = issue.get('fields', {}) or {}
             raw_team = None
@@ -1425,6 +1595,11 @@ def scenario_planner():
             elif team_field_id and fields.get(team_field_id) is not None:
                 raw_team = fields.get(team_field_id)
             team_name = extract_team_name(raw_team) if raw_team is not None else None
+            team_id = None
+            if raw_team is not None:
+                team_value = build_team_value(raw_team)
+                if isinstance(team_value, dict):
+                    team_id = team_value.get('id')
 
             epic_key = None
             if epic_link_field_id and fields.get(epic_link_field_id):
@@ -1434,30 +1609,209 @@ def scenario_planner():
                 epic_key = fields['parent'].get('key')
 
             assignee = fields.get('assignee') or {}
+            issue_type = (fields.get('issuetype') or {}).get('name') or ''
+            story_points = fields.get('customfield_10004')
+            priority = (fields.get('priority') or {}).get('name')
+            status = (fields.get('status') or {}).get('name')
             issue_obj = Issue(
                 key=issue.get('key'),
                 summary=fields.get('summary') or '',
-                issue_type=(fields.get('issuetype') or {}).get('name') or '',
+                issue_type=issue_type,
                 team=team_name,
                 assignee=assignee.get('displayName'),
-                story_points=fields.get('customfield_10004'),
-                priority=(fields.get('priority') or {}).get('name'),
-                status=(fields.get('status') or {}).get('name'),
+                story_points=story_points,
+                priority=priority,
+                status=status,
                 epic_key=epic_key,
+                team_id=team_id,
             )
             if issue_obj.key:
                 issues.append(issue_obj)
                 issue_keys.append(issue_obj.key)
+                if team_name:
+                    team_names.add(team_name)
+                if epic_key:
+                    epic_keys.add(epic_key)
+                issue_by_key[issue_obj.key] = {
+                    'key': issue_obj.key,
+                    'summary': issue_obj.summary,
+                    'type': issue_type,
+                    'team': team_name,
+                    'team_id': team_id,
+                    'assignee': issue_obj.assignee,
+                    'sp': story_points,
+                    'priority': priority,
+                    'status': status,
+                    'epicKey': epic_key,
+                }
 
         dependencies = collect_dependencies(issue_keys, headers)
         dependency_edges = {}
-        for issue_key, deps in dependencies.items():
-            depends_on = [d['key'] for d in deps if d.get('category') == 'dependency' and d.get('direction') == 'outward']
-            if depends_on:
-                dependency_edges[issue_key] = depends_on
+        edge_list = []
+        edge_set = set()
+        dependency_snapshots = {}
+        for deps in dependencies.values():
+            for dep in deps:
+                if dep.get('key'):
+                    dependency_snapshots[dep['key']] = dep
 
-        scheduled_list, scheduled_map = schedule_issues(issues, dependency_edges, scenario_config)
+        for issue_key, deps in dependencies.items():
+            for dep in deps:
+                prereq_key = dep.get('prereqKey')
+                dependent_key = dep.get('dependentKey')
+                if not prereq_key or not dependent_key:
+                    continue
+                category = dep.get('category')
+                edge_type = 'dependency' if category == 'dependency' else 'block' if category == 'block' else None
+                if edge_type is None:
+                    continue
+                if prereq_key == dependent_key:
+                    continue
+                edge_id = (prereq_key, dependent_key, edge_type)
+                if edge_id in edge_set:
+                    continue
+                edge_set.add(edge_id)
+                edge_list.append({'from': prereq_key, 'to': dependent_key, 'type': edge_type})
+                if edge_type in ('dependency', 'block'):
+                    dependency_edges.setdefault(dependent_key, []).append(prereq_key)
+
+        def matches_search(entry):
+            if not search_query:
+                return True
+            key = (entry.get('key') or '').lower()
+            summary = (entry.get('summary') or '').lower()
+            return search_query in key or search_query in summary
+
+        focus_keys = [
+            key for key, entry in issue_by_key.items()
+            if matches_search(entry) and (not team_filter_ids or entry.get('team_id') in team_filter_ids)
+        ]
+
+        adjacency = {}
+        for edge in edge_list:
+            adjacency.setdefault(edge['from'], set()).add(edge['to'])
+            adjacency.setdefault(edge['to'], set()).add(edge['from'])
+
+        if len(team_filter_ids) == 1:
+            focus_keys = [key for key in focus_keys if adjacency.get(key)]
+
+        focus_set = set(focus_keys)
+        context_keys = set()
+        for key in focus_set:
+            context_keys.update(adjacency.get(key, set()))
+        context_keys -= focus_set
+
+        included_keys = focus_set | context_keys
+        if not focus_set and not search_query:
+            included_keys = set(issue_by_key.keys())
+            focus_set = set(included_keys)
+
+        for key in context_keys:
+            if key in issue_by_key:
+                continue
+            snapshot = dependency_snapshots.get(key)
+            if not snapshot:
+                continue
+            issue_by_key[key] = {
+                'key': snapshot.get('key'),
+                'summary': snapshot.get('summary') or '',
+                'type': snapshot.get('issuetype'),
+                'team': snapshot.get('teamName'),
+                'team_id': snapshot.get('teamId'),
+                'assignee': None,
+                'sp': snapshot.get('storyPoints'),
+                'priority': snapshot.get('priority'),
+                'status': snapshot.get('status'),
+                'epicKey': snapshot.get('epicKey'),
+            }
+            if snapshot.get('teamName'):
+                team_names.add(snapshot.get('teamName'))
+            if snapshot.get('epicKey'):
+                epic_keys.add(snapshot.get('epicKey'))
+
+        capacity_details = {}
+        if sprint_label:
+            capacity_keys = {}
+            for name in team_names:
+                normalized = normalize_capacity_team_name(name)
+                if normalized:
+                    capacity_keys[name] = normalized
+            capacity_sizes, capacity_details = fetch_capacity_team_sizes(
+                sprint_label,
+                headers,
+                team_names=sorted(set(capacity_keys.values()))
+            )
+            scenario_config.team_sizes = {
+                name: capacity_sizes.get(norm)
+                for name, norm in capacity_keys.items()
+                if capacity_sizes.get(norm) is not None
+            }
+
+        epic_summary_by_key = {}
+        if epic_keys:
+            epic_issues = fetch_issues_by_keys(sorted(epic_keys), headers, ['summary'])
+            for epic in epic_issues:
+                fields = epic.get('fields') or {}
+                epic_summary_by_key[epic.get('key')] = fields.get('summary')
+
+        jira_base_url = (JIRA_URL or '').rstrip('/')
+
+        capacity_by_team = {}
+        if sprint_label:
+            for team_name in sorted(team_names):
+                normalized = normalize_capacity_team_name(team_name)
+                detail = capacity_details.get(normalized) if normalized else None
+                size = detail.get('watchers') if detail else None
+                capacity_by_team[team_name] = {
+                    'size': size,
+                    'capacityIssueKey': detail.get('issue_key') if detail else None,
+                    'watchersCount': detail.get('watchers') if detail else None
+                }
+
+        issue_objs = []
+        for key in included_keys:
+            entry = issue_by_key.get(key)
+            if not entry:
+                continue
+            issue_objs.append(Issue(
+                key=entry.get('key'),
+                summary=entry.get('summary') or '',
+                issue_type=entry.get('type') or '',
+                team=entry.get('team'),
+                assignee=entry.get('assignee'),
+                story_points=entry.get('sp'),
+                priority=entry.get('priority'),
+                status=entry.get('status'),
+                epic_key=entry.get('epicKey'),
+                team_id=entry.get('team_id'),
+            ))
+
+        scheduled_list, scheduled_map = schedule_issues(issue_objs, dependency_edges, scenario_config)
+        scheduled_by_key = {item.key: item for item in scheduled_list}
         slack, critical = compute_slack(scheduled_map, dependency_edges, scenario_config.quarter_end_date)
+        if app.debug:
+            blocked_edges = [edge for edge in edge_list if edge.get('type') == 'block']
+            for edge in blocked_edges[:20]:
+                prereq_key = edge.get('from')
+                dependent_key = edge.get('to')
+                assert prereq_key != dependent_key
+                prereq_item = scheduled_by_key.get(prereq_key)
+                dependent_item = scheduled_by_key.get(dependent_key)
+                prereq_start = prereq_item.start_date.isoformat() if prereq_item and prereq_item.start_date else None
+                prereq_end = prereq_item.end_date.isoformat() if prereq_item and prereq_item.end_date else None
+                dependent_start = dependent_item.start_date.isoformat() if dependent_item and dependent_item.start_date else None
+                dependent_end = dependent_item.end_date.isoformat() if dependent_item and dependent_item.end_date else None
+                print(
+                    "scenario blocked_by edge",
+                    {
+                        "prereqKey": prereq_key,
+                        "dependentKey": dependent_key,
+                        "prereqStart": prereq_start,
+                        "prereqEnd": prereq_end,
+                        "dependentStart": dependent_start,
+                        "dependentEnd": dependent_end,
+                    },
+                )
 
         total_weeks = max(1.0, (scenario_config.quarter_end_date - scenario_config.start_date).days / 7.0)
         lane_usage = {}
@@ -1481,23 +1835,39 @@ def scenario_planner():
                 unschedulable.append(item.key)
 
         response_issues = []
-        for item in scheduled_list:
+        for key in sorted(included_keys):
+            entry = issue_by_key.get(key)
+            item = scheduled_by_key.get(key)
+            if not entry:
+                continue
+            epic_key = entry.get('epicKey')
             response_issues.append({
-                'key': item.key,
-                'summary': item.summary,
-                'lane': item.lane,
-                'start_date': item.start_date.isoformat() if item.start_date else None,
-                'end_date': item.end_date.isoformat() if item.end_date else None,
-                'blocked_by': item.blocked_by,
-                'scheduled_reason': item.scheduled_reason,
-                'duration_weeks': item.duration_weeks,
-                'slack_weeks': item.slack_weeks,
-                'is_critical': item.is_critical,
-                'is_late': item.is_late,
+                'key': key,
+                'summary': entry.get('summary'),
+                'type': entry.get('type'),
+                'team': entry.get('team'),
+                'team_id': entry.get('team_id'),
+                'assignee': entry.get('assignee'),
+                'sp': entry.get('sp'),
+                'priority': entry.get('priority'),
+                'status': entry.get('status'),
+                'epicKey': epic_key,
+                'epicSummary': epic_summary_by_key.get(epic_key),
+                'start': item.start_date.isoformat() if item and item.start_date else None,
+                'end': item.end_date.isoformat() if item and item.end_date else None,
+                'blockedBy': item.blocked_by if item else [],
+                'scheduledReason': item.scheduled_reason if item else 'context_only',
+                'durationWeeks': item.duration_weeks if item else None,
+                'slackWeeks': item.slack_weeks if item else None,
+                'isCritical': item.is_critical if item else False,
+                'isLate': item.is_late if item else False,
+                'isContext': key in context_keys,
+                'url': f'{jira_base_url}/browse/{key}' if jira_base_url else None,
             })
 
         result = {
             'generatedAt': datetime.now().isoformat(),
+            'jira_base_url': jira_base_url,
             'config': {
                 'start_date': scenario_config.start_date.isoformat(),
                 'quarter_end_date': scenario_config.quarter_end_date.isoformat(),
@@ -1505,6 +1875,7 @@ def scenario_planner():
                 'wip_limit': scenario_config.wip_limit,
                 'sickleave_buffer': scenario_config.sickleave_buffer,
                 'lane_mode': scenario_config.lane_mode,
+                'sprint': sprint_label
             },
             'summary': {
                 'critical_path': critical,
@@ -1514,7 +1885,12 @@ def scenario_planner():
                 'deadline_met': len(late_items) == 0 and len(unschedulable) == 0,
             },
             'issues': response_issues,
-            'dependencies': dependency_edges,
+            'dependencies': [edge for edge in edge_list if edge['from'] in included_keys and edge['to'] in included_keys],
+            'capacity_by_team': capacity_by_team,
+            'focus_set': {
+                'focused_issue_keys': sorted(focus_set),
+                'context_issue_keys': sorted(context_keys),
+            },
         }
 
         SCENARIO_CACHE['generatedAt'] = result['generatedAt']

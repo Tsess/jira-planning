@@ -243,14 +243,27 @@ Priority weights used for weighted delivery:
 
 ## 🗓️ Scenario Planner
 
-The Scenario tab builds a quarter timeline that accounts for dependencies, capacity limits, and WIP:
+The Scenario tab builds a quarter timeline from Jira data:
 
-- **Inputs**: quarter start/end dates, SP->weeks ratio, WIP limit, sickleave buffer, and team size/vacation overrides.
+- **Capacity source**: team capacity comes from the Capacity Estimation project (watchers per team issue).
+- **Controls**: only lane mode switching (Team / Epic / Assignee).
 - **Scheduling**: topological dependency ordering, then priority (highest -> lowest) and larger SP first when ready.
+- **Blocked links**: blocks/is blocked by are treated as prerequisites, so blocked work does not run in parallel with blockers.
+- **Assignee lanes**: single-threaded (WIP=1) so one assignee only runs one item at a time.
 - **Outputs**: per-issue start/end dates, critical path, slack, bottleneck lanes, and late items.
 - **Missing data**: issues with missing SP or missing dependencies are marked unschedulable.
+- **Context**: dependency neighbors (1 hop) are included as context/ghost nodes so cross-epic deps stay visible.
+- **UI**: quarter start markers are shown in the timeline; panel starts collapsed and unloads when closed to keep it fast.
 
-Assumption: **1 SP = 2 working weeks** by default (configurable in the Scenario panel).
+Assumption: **1 SP = 2 working weeks** (fixed in the planner).
+
+Scenario API response (used by the UI):
+- `jira_base_url`
+- `issues[]`: `key`, `summary`, `type`, `team`, `epicKey`, `epicSummary`, `sp`, `status`, `priority`, `start`, `end`, `url`, `isContext`
+- `dependencies[]`: `{ from, to, type }` edges (dependency/block)
+- `capacity_by_team`: `{ teamName: { size, capacityIssueKey, watchersCount } }`
+- `focus_set`: `focused_issue_keys`, `context_issue_keys`
+- `summary`: `critical_path`, `bottleneck_lanes`, `late_items`, `unschedulable`, `deadline_met`
 
 ## 🔒 Security Notes
 

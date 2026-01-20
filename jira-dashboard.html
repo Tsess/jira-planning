@@ -1479,7 +1479,7 @@
             margin-bottom: 1rem;
         }
 
-        /* Sprint Planning Styles */
+        /* Planning Styles */
         .planning-button {
             background: transparent;
             color: var(--text-secondary);
@@ -1583,12 +1583,31 @@
             background: var(--bg-secondary);
             border-color: var(--border);
             max-height: 2400px;
-            padding: 0.75rem;
+            padding: 0;
             margin-top: 1rem;
             margin-bottom: 1rem;
             opacity: 1;
             overflow: visible;
             box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
+            border-radius: 0;
+            box-sizing: border-box;
+            width: 100%;
+            max-width: none;
+        }
+
+        .scenario-fullbleed {
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+            background: var(--bg-secondary);
+            overflow-x: hidden;
+        }
+
+        .scenario-inner {
+            max-width: none;
+            padding: 1rem 1.5rem 1.25rem;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .scenario-header {
@@ -1614,10 +1633,11 @@
         }
 
         .scenario-controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            display: flex;
+            align-items: flex-end;
             gap: 0.6rem;
-            margin-bottom: 0.9rem;
+            margin-left: auto;
+            flex-wrap: wrap;
         }
 
         .scenario-control label {
@@ -1640,10 +1660,6 @@
             color: var(--text-primary);
         }
 
-        .scenario-input.small {
-            width: 90px;
-        }
-
         .scenario-toggle-group {
             display: flex;
             gap: 0.4rem;
@@ -1662,65 +1678,15 @@
             color: var(--bg-primary);
         }
 
-        .scenario-team-config {
-            border: 1px solid var(--border);
-            border-radius: 0.6rem;
-            padding: 0.75rem;
-            margin-bottom: 0.9rem;
-            background: #fff;
-        }
-
-        .scenario-team-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .scenario-team-title {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-secondary);
-        }
-
-        .scenario-team-defaults {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .scenario-team-default-label {
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-secondary);
-            margin-bottom: 0.2rem;
-            font-family: 'IBM Plex Mono', monospace;
-        }
-
-        .scenario-team-grid {
-            display: grid;
-            grid-template-columns: 1.4fr 0.6fr 0.6fr;
-            gap: 0.5rem;
-            align-items: center;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.7rem;
-        }
-
-        .scenario-team-grid-header {
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-size: 0.6rem;
-        }
-
+        .scenario-team-config,
+        .scenario-team-header,
+        .scenario-team-title,
+        .scenario-team-defaults,
+        .scenario-team-default-label,
+        .scenario-team-grid,
+        .scenario-team-grid-header,
         .scenario-team-name {
-            color: var(--text-primary);
+            display: none;
         }
 
         .scenario-summary {
@@ -1728,6 +1694,7 @@
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 0.75rem;
             margin-bottom: 0.9rem;
+            width: 100%;
         }
 
         .scenario-card {
@@ -1754,13 +1721,18 @@
         }
 
         .scenario-timeline {
-            --scenario-label-width: 180px;
-            --scenario-axis-height: 24px;
+            --scenario-label-width: 190px;
+            --scenario-axis-height: 26px;
             border: 1px solid var(--border);
             border-radius: 0.6rem;
             background: #fff;
-            padding: 0.75rem;
+            padding: 0.6rem;
             position: relative;
+            max-height: 70vh;
+            overflow: auto;
+            width: 100%;
+            margin: 0;
+            box-sizing: border-box;
         }
 
         .scenario-axis {
@@ -1772,51 +1744,150 @@
             margin-bottom: 0.5rem;
             padding-left: var(--scenario-label-width);
             min-height: var(--scenario-axis-height);
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 4;
+            padding-top: 0.2rem;
+            width: 100%;
+            min-width: 0;
         }
 
         .scenario-lanes {
-            display: grid;
-            gap: 0.4rem;
             position: relative;
+            min-height: 120px;
+            width: 100%;
+            min-width: 0;
         }
 
         .scenario-lane {
+            position: absolute;
+            left: 0;
+            right: 0;
             display: grid;
             grid-template-columns: var(--scenario-label-width) 1fr;
-            align-items: center;
-            gap: 0.75rem;
+            align-items: stretch;
+            gap: 0.6rem;
+            min-width: 0;
+            width: 100%;
         }
 
         .scenario-lane-label {
             font-family: 'IBM Plex Mono', monospace;
             font-size: 0.7rem;
             color: var(--text-primary);
+            background: transparent;
+            border: none;
+            padding: 0.1rem 0;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            cursor: pointer;
+            min-width: 0;
+            text-transform: none;
+            letter-spacing: normal;
+            margin-right: 0;
+            border-radius: 0.45rem;
+            transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .scenario-lane-label:disabled {
+            cursor: default;
+            opacity: 0.7;
+        }
+
+        .scenario-lane-label:hover,
+        .scenario-lane-label:focus-visible {
+            background: rgba(59, 130, 246, 0.08);
+            color: #0f172a;
+            transform: none;
+            box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18);
+        }
+
+        .scenario-lane-title {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.7rem;
+            min-width: 0;
+        }
+
+        .scenario-lane-title-text {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .scenario-lane-key {
+            font-size: 0.58rem;
+            color: var(--text-secondary);
+        }
+
+        .scenario-lane-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.2rem;
+            font-size: 0.58rem;
+            color: var(--text-secondary);
+        }
+
+        .scenario-lane-capacity {
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }
+
+        .scenario-lane-status.ok {
+            color: var(--good);
+            font-weight: 600;
+        }
+
+        .scenario-lane-status.risk,
+        .scenario-lane-risk {
+            color: #d4380d;
+            font-weight: 600;
+        }
+
+        .scenario-lane-sp {
+            color: var(--text-secondary);
+        }
+
+        .scenario-lane-more {
+            color: var(--text-secondary);
+            font-style: italic;
         }
 
         .scenario-lane-track {
             position: relative;
-            height: 38px;
+            min-height: 44px;
             background: rgba(26, 26, 26, 0.02);
             border-radius: 0.5rem;
             overflow: hidden;
+            min-width: 0;
         }
 
         .scenario-bar {
             position: absolute;
             top: 6px;
-            height: 26px;
+            height: 32px;
             border-radius: 0.5rem;
-            background: rgba(29, 122, 252, 0.18);
-            border: 1px solid rgba(29, 122, 252, 0.4);
+            background: rgba(59, 130, 246, 0.16);
+            border: 1px solid rgba(59, 130, 246, 0.4);
             display: flex;
             align-items: center;
-            padding: 0 0.35rem;
+            padding: 0.25rem 0.4rem;
             font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             color: var(--text-primary);
-            white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;
+            cursor: pointer;
+            z-index: 2;
+            text-decoration: none;
+            min-width: 0;
         }
 
         .scenario-bar.critical {
@@ -1829,14 +1900,163 @@
             background: rgba(212, 56, 13, 0.16);
         }
 
-        .scenario-bar.blocked::before {
+        .scenario-bar.blocked {
+            border-style: dashed;
+            background: repeating-linear-gradient(
+                135deg,
+                rgba(212, 56, 13, 0.12),
+                rgba(212, 56, 13, 0.12) 6px,
+                rgba(212, 56, 13, 0.02) 6px,
+                rgba(212, 56, 13, 0.02) 12px
+            );
+            padding-right: 0.75rem;
+        }
+
+        .scenario-bar.blocked::after {
             content: '';
             position: absolute;
-            left: 0;
+            top: 4px;
+            bottom: 4px;
+            right: 4px;
+            border-right: 2px dashed rgba(239, 68, 68, 0.85);
+            pointer-events: none;
+        }
+
+        .scenario-bar.context {
+            border-style: dashed;
+            border-color: rgba(148, 163, 184, 0.6);
+            background: rgba(148, 163, 184, 0.08);
+            color: var(--text-secondary);
+        }
+
+        .scenario-bar.is-focused {
+            outline: 2px solid rgba(59, 130, 246, 0.8);
+            outline-offset: 2px;
+        }
+
+        .scenario-bar.is-upstream {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .scenario-bar.is-downstream {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .scenario-bar.flash {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+        }
+
+        .scenario-bar.dimmed {
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        .scenario-bar.search-match {
+            box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.5);
+        }
+
+        .scenario-bar.unscheduled {
+            border-style: dotted;
+            background: rgba(148, 163, 184, 0.12);
+            color: var(--text-secondary);
+        }
+
+        .scenario-bar.excluded {
+            border-style: dashed;
+            border-color: rgba(148, 163, 184, 0.55);
+            background: repeating-linear-gradient(
+                135deg,
+                rgba(148, 163, 184, 0.16),
+                rgba(148, 163, 184, 0.16) 6px,
+                rgba(148, 163, 184, 0.04) 6px,
+                rgba(148, 163, 184, 0.04) 12px
+            );
+            color: var(--text-secondary);
+        }
+
+        .scenario-bar-inner {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            overflow: hidden;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .scenario-bar-summary {
+            font-size: 0.62rem;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        .scenario-bar-meta {
+            display: flex;
+            gap: 0.35rem;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.58rem;
+            white-space: nowrap;
+        }
+
+        .scenario-bar-key {
+            font-weight: 600;
+        }
+
+        .scenario-badge {
+            border: 1px solid rgba(148, 163, 184, 0.5);
+            border-radius: 999px;
+            padding: 0 0.3rem;
+            font-size: 0.55rem;
+            color: var(--text-secondary);
+        }
+
+        .scenario-epic-bar {
+            position: absolute;
+            border-radius: 0.6rem;
+            background: rgba(20, 184, 166, 0.08);
+            border: 1px solid rgba(20, 184, 166, 0.35);
+            pointer-events: auto;
+            overflow: hidden;
+            padding: 0.2rem 0.4rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.58rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            z-index: 1;
+            cursor: pointer;
+            min-width: 0;
+        }
+
+        .scenario-epic-bar.excluded {
+            border-style: dashed;
+            border-color: rgba(148, 163, 184, 0.55);
+            background: rgba(148, 163, 184, 0.08);
+            color: var(--text-secondary);
+        }
+
+        .scenario-epic-bar-label {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .scenario-quarter-line {
+            position: absolute;
             top: 0;
             bottom: 0;
-            width: 6px;
-            background: rgba(212, 56, 13, 0.6);
+            width: 2px;
+            background: rgba(239, 68, 68, 0.65);
+            pointer-events: none;
+            z-index: 1;
         }
 
         .scenario-deadline {
@@ -1846,15 +2066,53 @@
             width: 2px;
             background: rgba(212, 56, 13, 0.6);
             pointer-events: none;
+            z-index: 2;
         }
 
         .scenario-deps {
             position: absolute;
-            left: var(--scenario-label-width);
-            right: 0;
-            top: calc(var(--scenario-axis-height) + 8px);
-            bottom: 12px;
+            left: 0;
+            top: 0;
             pointer-events: none;
+            overflow: visible;
+            z-index: 3;
+        }
+
+        .scenario-edge {
+            stroke: rgba(148, 163, 184, 0.5);
+            stroke-width: 1.4;
+            fill: none;
+        }
+
+        .scenario-edge.active {
+            stroke: rgba(59, 130, 246, 0.8);
+            stroke-width: 2;
+            opacity: 1;
+        }
+
+        .scenario-edge.context {
+            opacity: 0.35;
+        }
+
+        .scenario-edge.faded {
+            opacity: 0.15;
+        }
+
+        .scenario-edge.block {
+            stroke: rgba(239, 68, 68, 0.7);
+            stroke-dasharray: 4 3;
+        }
+
+        .scenario-epic-edge {
+            stroke: rgba(20, 184, 166, 0.45);
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .scenario-epic-edge-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.55rem;
+            fill: var(--text-secondary);
         }
 
         .scenario-error {
@@ -1882,10 +2140,107 @@
         .scenario-link {
             color: var(--text-secondary);
             text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            background: none;
+            border: none;
+            padding: 0.1rem 0.2rem;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 0.4rem;
+            transition: color 0.15s ease, background 0.15s ease;
+            text-transform: none;
+            letter-spacing: normal;
+            margin-right: 0;
         }
 
         .scenario-link:hover {
+            text-decoration: none;
+            color: #0f172a;
+            background: rgba(16, 185, 129, 0.1);
+            box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.18);
+            transform: none;
+        }
+
+        .scenario-link:focus-visible {
+            text-decoration: none;
+            color: #0f172a;
+            background: rgba(16, 185, 129, 0.14);
+            box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.24);
+            outline: none;
+        }
+
+        .scenario-link-key {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+        }
+
+        .scenario-focus-indicator {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .scenario-focus-exit {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 0;
             text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .scenario-focus-exit span {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .scenario-tooltip {
+            position: fixed;
+            padding: 0.35rem 0.5rem;
+            background: #2a2a2a;
+            color: #f6f3ee;
+            font-size: 0.6rem;
+            line-height: 1.3;
+            border-radius: 0.35rem;
+            max-width: 280px;
+            box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            opacity: 0;
+            transform: translate(6px, 6px);
+            transition: opacity 0.05s ease, transform 0.05s ease;
+            pointer-events: none;
+            z-index: 60;
+            white-space: normal;
+        }
+
+        .scenario-tooltip.visible {
+            opacity: 1;
+            transform: translate(0, 0);
+        }
+
+        .scenario-tooltip-key {
+            font-family: 'IBM Plex Mono', monospace;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .scenario-tooltip-note {
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .stats-controls {
@@ -2823,7 +3178,11 @@
             try {
                 const raw = window.localStorage.getItem(UI_PREFS_KEY);
                 if (!raw) return null;
-                return JSON.parse(raw);
+                const prefs = JSON.parse(raw);
+                if (prefs && typeof prefs === 'object') {
+                    prefs.showScenario = false;
+                }
+                return prefs;
             } catch (e) {
                 return null;
             }
@@ -2904,16 +3263,35 @@
             const [scenarioError, setScenarioError] = useState('');
             const [scenarioData, setScenarioData] = useState(null);
             const [scenarioLaneMode, setScenarioLaneMode] = useState(savedPrefsRef.current.scenarioLaneMode ?? 'team');
-            const [scenarioStartDate, setScenarioStartDate] = useState(savedPrefsRef.current.scenarioStartDate ?? '');
-            const [scenarioEndDate, setScenarioEndDate] = useState(savedPrefsRef.current.scenarioEndDate ?? '');
-            const [scenarioSpToWeeks, setScenarioSpToWeeks] = useState(savedPrefsRef.current.scenarioSpToWeeks ?? 2);
-            const [scenarioWipLimit, setScenarioWipLimit] = useState(savedPrefsRef.current.scenarioWipLimit ?? 1);
-            const [scenarioSickleave, setScenarioSickleave] = useState(savedPrefsRef.current.scenarioSickleave ?? 10);
-            const [scenarioDefaultTeamSize, setScenarioDefaultTeamSize] = useState(savedPrefsRef.current.scenarioDefaultTeamSize ?? 2);
-            const [scenarioDefaultVacation, setScenarioDefaultVacation] = useState(savedPrefsRef.current.scenarioDefaultVacation ?? 0);
-            const [scenarioTeamOverrides, setScenarioTeamOverrides] = useState(savedPrefsRef.current.scenarioTeamOverrides ?? {});
             const scenarioTimelineRef = useRef(null);
             const [scenarioLayout, setScenarioLayout] = useState({ width: 0, height: 0 });
+            const [scenarioCollapsedLanes, setScenarioCollapsedLanes] = useState({});
+            const [scenarioHoverKey, setScenarioHoverKey] = useState(null);
+            const [scenarioFlashKey, setScenarioFlashKey] = useState(null);
+            const [scenarioScrollTop, setScenarioScrollTop] = useState(0);
+            const [scenarioViewportHeight, setScenarioViewportHeight] = useState(0);
+            const [scenarioEpicFocus, setScenarioEpicFocus] = useState(null);
+            const [scenarioRangeOverride, setScenarioRangeOverride] = useState(null);
+            const scenarioFocusRestoreRef = useRef(null);
+            const scenarioSkipAutoCollapseRef = useRef(false);
+            const scenarioTeamCollapseInitRef = useRef(false);
+            const scenarioEdgeUpdatePendingRef = useRef(false);
+            const scenarioScrollFrameRef = useRef(null);
+            const scenarioResizeFrameRef = useRef(null);
+            const scenarioPendingScrollRef = useRef(null);
+            const [scenarioTooltip, setScenarioTooltip] = useState({
+                visible: false,
+                x: 0,
+                y: 0,
+                summary: '',
+                key: '',
+                sp: null,
+                note: ''
+            });
+            const scenarioTooltipRef = useRef(null);
+            const scenarioTooltipAnchorRef = useRef(null);
+            const scenarioIssueRefMap = useRef(new Map());
+            const [scenarioEdgeRender, setScenarioEdgeRender] = useState({ width: 0, height: 0, paths: [] });
             const [dependencyData, setDependencyData] = useState({});
             const [dependencyFocus, setDependencyFocus] = useState(null);
             const [dependencyLookupCache, setDependencyLookupCache] = useState({});
@@ -2938,12 +3316,36 @@
                 return (status || '').toLowerCase().replace(/\s+/g, ' ').trim();
             };
 
-            const formatDateInput = (value) => {
-                if (!value) return '';
-                const year = value.getFullYear();
-                const month = `${value.getMonth() + 1}`.padStart(2, '0');
-                const day = `${value.getDate()}`.padStart(2, '0');
-                return `${year}-${month}-${day}`;
+            const normalizeScenarioSummary = (summary) => {
+                const text = String(summary || '').trim();
+                if (!text) return '';
+                return text.replace(/^issue\.\s*/i, '');
+            };
+
+            const matchesScenarioSearch = (issue, query) => {
+                if (!query) return true;
+                const assigneeValue = issue?.assignee?.displayName || issue?.assignee?.name || issue?.assignee;
+                const teamValue = issue?.team?.name || issue?.team;
+                const tokens = [
+                    issue?.summary,
+                    issue?.key,
+                    issue?.epicKey,
+                    issue?.epicSummary,
+                    teamValue,
+                    assigneeValue
+                ]
+                    .filter(Boolean)
+                    .map(value => String(value).toLowerCase());
+                return tokens.some(value => value.includes(query));
+            };
+
+            const registerScenarioIssueRef = (issueKey) => (node) => {
+                const map = scenarioIssueRefMap.current;
+                if (node) {
+                    map.set(issueKey, node);
+                } else {
+                    map.delete(issueKey);
+                }
             };
 
 
@@ -2991,16 +3393,30 @@
             }, [showScenario]);
 
             useEffect(() => {
-                if (!showScenario) return;
-                const today = new Date();
-                if (!scenarioStartDate) {
-                    setScenarioStartDate(formatDateInput(today));
+                if (showScenario) {
+                    setScenarioData(null);
+                    setScenarioError('');
                 }
-                if (!scenarioEndDate) {
-                    const end = new Date(today);
-                    end.setDate(end.getDate() + 90);
-                    setScenarioEndDate(formatDateInput(end));
+            }, [showScenario]);
+
+            useEffect(() => {
+                if (showScenario) return;
+                scenarioIssueRefMap.current.clear();
+                scenarioEdgeUpdatePendingRef.current = false;
+                if (scenarioScrollFrameRef.current) {
+                    window.cancelAnimationFrame(scenarioScrollFrameRef.current);
+                    scenarioScrollFrameRef.current = null;
                 }
+                if (scenarioResizeFrameRef.current) {
+                    window.cancelAnimationFrame(scenarioResizeFrameRef.current);
+                    scenarioResizeFrameRef.current = null;
+                }
+                scenarioPendingScrollRef.current = null;
+                setScenarioEdgeRender({ width: 0, height: 0, paths: [] });
+                setScenarioHoverKey(null);
+                setScenarioFlashKey(null);
+                setScenarioTooltip(prev => (prev.visible ? { ...prev, visible: false } : prev));
+                setScenarioLayout({ width: 0, height: 0 });
             }, [showScenario]);
 
             useEffect(() => {
@@ -3053,14 +3469,6 @@
                     statsView,
                     statsGraphMode,
                     scenarioLaneMode,
-                    scenarioStartDate,
-                    scenarioEndDate,
-                    scenarioSpToWeeks,
-                    scenarioWipLimit,
-                    scenarioSickleave,
-                    scenarioDefaultTeamSize,
-                    scenarioDefaultVacation,
-                    scenarioTeamOverrides,
                     excludedStatsEpics,
                     showMissingAlert,
                     showBlockedAlert,
@@ -3083,14 +3491,6 @@
                 statsView,
                 statsGraphMode,
                 scenarioLaneMode,
-                scenarioStartDate,
-                scenarioEndDate,
-                scenarioSpToWeeks,
-                scenarioWipLimit,
-                scenarioSickleave,
-                scenarioDefaultTeamSize,
-                scenarioDefaultVacation,
-                scenarioTeamOverrides,
                 excludedStatsEpics,
                 showMissingAlert,
                 showBlockedAlert,
@@ -3410,35 +3810,12 @@
             };
 
             const buildScenarioPayload = () => {
-                const teamSizes = {};
-                const vacationWeeks = {};
-                scenarioTeamNames.forEach((name) => {
-                    const override = scenarioTeamOverrides[name] || {};
-                    const rawSize = override.size === '' || override.size === undefined ? scenarioDefaultTeamSize : override.size;
-                    const rawVacation = override.vacation === '' || override.vacation === undefined ? scenarioDefaultVacation : override.vacation;
-                    const size = Number(rawSize);
-                    const vacation = Number(rawVacation);
-                    if (!Number.isNaN(size) && size > 0) {
-                        teamSizes[name] = size;
-                    }
-                    if (!Number.isNaN(vacation) && vacation > 0) {
-                        vacationWeeks[name] = vacation;
-                    }
-                });
-
                 return {
                     config: {
-                        start_date: scenarioStartDate,
-                        quarter_end_date: scenarioEndDate,
-                        sp_to_weeks: Number(scenarioSpToWeeks || 0) || 2,
-                        wip_limit: Number(scenarioWipLimit || 1),
-                        sickleave_buffer: Math.max(0, Number(scenarioSickleave || 0) / 100),
-                        team_sizes: teamSizes,
-                        vacation_weeks: vacationWeeks,
                         lane_mode: scenarioLaneMode
                     },
                     filters: {
-                        sprint: selectedSprint || null,
+                        sprint: selectedSprintInfo?.name || selectedSprint || null,
                         teams: scenarioTeamIds
                     }
                 };
@@ -3771,23 +4148,6 @@
                 return Array.from(selectedTeamSet);
             }, [isAllTeamsSelected, selectedTeamSet, teamOptions]);
 
-            const scenarioTeamNames = React.useMemo(() => {
-                return scenarioTeamIds
-                    .map(id => teamNameById.get(id))
-                    .filter(Boolean);
-            }, [scenarioTeamIds, teamNameById]);
-
-            useEffect(() => {
-                setScenarioTeamOverrides((prev) => {
-                    const next = {};
-                    scenarioTeamNames.forEach((name) => {
-                        if (prev[name]) {
-                            next[name] = prev[name];
-                        }
-                    });
-                    return next;
-                });
-            }, [scenarioTeamNames.join('|')]);
 
             const toggleTeamSelection = (teamId) => {
                 if (teamId === 'all') {
@@ -3815,118 +4175,1060 @@
             const scenarioIssues = scenarioData?.issues || [];
             const scenarioConfig = scenarioData?.config || {};
             const scenarioSummary = scenarioData?.summary || {};
-            const scenarioDependencies = scenarioData?.dependencies || {};
-            const scenarioStart = parseScenarioDate(scenarioConfig.start_date || scenarioStartDate);
-            const scenarioDeadline = parseScenarioDate(scenarioConfig.quarter_end_date || scenarioEndDate);
-            const scenarioEnd = React.useMemo(() => {
+            const scenarioBaseUrl = scenarioData?.jira_base_url || jiraUrl || '';
+            const scenarioDependencies = scenarioData?.dependencies || [];
+            const scenarioSearchQuery = React.useMemo(
+                () => (searchQuery || '').trim().toLowerCase(),
+                [searchQuery]
+            );
+            const scenarioSearchMatchSet = React.useMemo(() => {
+                const matches = new Set();
+                if (!scenarioSearchQuery) return matches;
+                scenarioIssues.forEach(issue => {
+                    if (issue?.key && matchesScenarioSearch(issue, scenarioSearchQuery)) {
+                        matches.add(issue.key);
+                    }
+                });
+                return matches;
+            }, [scenarioIssues, scenarioSearchQuery]);
+            const scenarioFilteredIssues = React.useMemo(() => {
+                if (!scenarioSearchQuery) return scenarioIssues;
+                return scenarioIssues.filter(issue => scenarioSearchMatchSet.has(issue.key));
+            }, [scenarioIssues, scenarioSearchQuery, scenarioSearchMatchSet]);
+            const scenarioExcludedIssueKeys = React.useMemo(() => {
+                const keys = new Set();
+                scenarioIssues.forEach(issue => {
+                    if (excludedEpicSet.has(issue?.epicKey || '')) {
+                        keys.add(issue.key);
+                    }
+                });
+                return keys;
+            }, [scenarioIssues, excludedEpicSet]);
+            const scenarioFocusSet = React.useMemo(
+                () => new Set(scenarioData?.focus_set?.focused_issue_keys || []),
+                [scenarioData]
+            );
+            const scenarioContextSet = React.useMemo(
+                () => new Set(scenarioData?.focus_set?.context_issue_keys || []),
+                [scenarioData]
+            );
+            const scenarioCapacityByTeam = scenarioData?.capacity_by_team || {};
+            const scenarioIssueByKey = React.useMemo(() => {
+                const map = new Map();
+                scenarioIssues.forEach(issue => {
+                    if (issue?.key) {
+                        map.set(issue.key, issue);
+                    }
+                });
+                return map;
+            }, [scenarioIssues]);
+            const scenarioBaseStart = parseScenarioDate(scenarioConfig.start_date);
+            const scenarioDeadline = parseScenarioDate(scenarioConfig.quarter_end_date);
+            const scenarioBaseEnd = React.useMemo(() => {
                 if (!scenarioDeadline) return null;
                 let latest = scenarioDeadline;
                 scenarioIssues.forEach(issue => {
-                    if (!issue.end_date) return;
-                    const end = parseScenarioDate(issue.end_date);
+                    if (!issue.end) return;
+                    const end = parseScenarioDate(issue.end);
                     if (end && end > latest) {
                         latest = end;
                     }
                 });
                 return latest;
             }, [scenarioDeadline, scenarioIssues]);
+            const scenarioViewStart = scenarioRangeOverride?.start || scenarioBaseStart;
+            const scenarioViewEnd = scenarioRangeOverride?.end || scenarioBaseEnd;
+            const scenarioFocusEpicKey = scenarioEpicFocus?.key || null;
+            const scenarioFocusIssueKeys = React.useMemo(() => {
+                const keys = new Set();
+                if (!scenarioFocusEpicKey) return keys;
+                scenarioIssues.forEach(issue => {
+                    if (issue.epicKey === scenarioFocusEpicKey && issue.key) {
+                        keys.add(issue.key);
+                    }
+                });
+                return keys;
+            }, [scenarioIssues, scenarioFocusEpicKey]);
+            const scenarioFocusContextKeys = React.useMemo(() => {
+                const keys = new Set();
+                if (!scenarioFocusEpicKey) return keys;
+                (scenarioDependencies || []).forEach(edge => {
+                    if (!edge?.from || !edge?.to) return;
+                    const fromInFocus = scenarioFocusIssueKeys.has(edge.from);
+                    const toInFocus = scenarioFocusIssueKeys.has(edge.to);
+                    if (fromInFocus && !toInFocus) {
+                        keys.add(edge.to);
+                    } else if (toInFocus && !fromInFocus) {
+                        keys.add(edge.from);
+                    }
+                });
+                return keys;
+            }, [scenarioDependencies, scenarioFocusIssueKeys, scenarioFocusEpicKey]);
+            const scenarioTimelineIssues = React.useMemo(() => {
+                const source = scenarioEpicFocus ? scenarioIssues : scenarioFilteredIssues;
+                if (!scenarioEpicFocus) return source;
+                return source.filter(issue =>
+                    scenarioFocusIssueKeys.has(issue.key) || scenarioFocusContextKeys.has(issue.key)
+                );
+            }, [scenarioIssues, scenarioFilteredIssues, scenarioEpicFocus, scenarioFocusIssueKeys, scenarioFocusContextKeys]);
+            const scenarioTimelineIssueKeys = React.useMemo(() => {
+                return new Set(scenarioTimelineIssues.map(issue => issue.key));
+            }, [scenarioTimelineIssues]);
+            const scenarioLaneForIssue = (issue) => {
+                if (scenarioEpicFocus?.key) {
+                    return scenarioEpicFocus.key;
+                }
+                if (scenarioLaneMode === 'epic') {
+                    return issue.epicKey || 'No Epic';
+                }
+                if (scenarioLaneMode === 'assignee') {
+                    return issue.assignee || 'Unassigned';
+                }
+                return issue.team || 'Unassigned';
+            };
+            const scenarioLaneInfo = React.useMemo(() => {
+                const info = new Map();
+                scenarioTimelineIssues.forEach(issue => {
+                    const lane = scenarioLaneForIssue(issue);
+                    const current = info.get(lane) || {
+                        label: lane,
+                        key: lane,
+                        totalSp: 0,
+                        lateCount: 0,
+                        unschedulableCount: 0,
+                        capacity: null
+                    };
+                    const countIssue = !scenarioEpicFocus || scenarioFocusIssueKeys.has(issue.key);
+                    const isExcluded = scenarioExcludedIssueKeys.has(issue.key);
+                    if (countIssue) {
+                        current.totalSp += Number(issue.sp || 0);
+                        if (!isExcluded && (!issue.start || !issue.end)) {
+                            current.unschedulableCount += 1;
+                        }
+                        if (!isExcluded && issue.isLate) {
+                            current.lateCount += 1;
+                        }
+                    }
+                    if (scenarioLaneMode === 'epic') {
+                        current.key = issue.epicKey || 'No Epic';
+                        current.label = issue.epicSummary || issue.epicKey || 'No Epic';
+                    }
+                    if (scenarioLaneMode === 'team') {
+                        const capacity = scenarioCapacityByTeam[issue.team || '']?.size;
+                        current.capacity = capacity ?? current.capacity;
+                    }
+                    info.set(lane, current);
+                });
+                if (scenarioEpicFocus?.key) {
+                    const existing = info.get(scenarioEpicFocus.key) || {
+                        label: scenarioEpicFocus.key,
+                        key: scenarioEpicFocus.key,
+                        totalSp: 0,
+                        lateCount: 0,
+                        unschedulableCount: 0,
+                        capacity: null
+                    };
+                    existing.label = scenarioEpicFocus.summary || scenarioEpicFocus.key;
+                    existing.key = scenarioEpicFocus.key;
+                    info.set(scenarioEpicFocus.key, existing);
+                }
+                return info;
+            }, [scenarioTimelineIssues, scenarioLaneMode, scenarioCapacityByTeam, scenarioEpicFocus, scenarioFocusIssueKeys, scenarioExcludedIssueKeys]);
+            const scenarioSearchFilterEnabled = Boolean(scenarioSearchQuery && !scenarioEpicFocus);
+            const scenarioLateItems = React.useMemo(() => {
+                return (scenarioSummary.late_items || []).filter(key => (
+                    !scenarioExcludedIssueKeys.has(key)
+                    && (!scenarioSearchFilterEnabled || scenarioSearchMatchSet.has(key))
+                ));
+            }, [scenarioSummary, scenarioExcludedIssueKeys, scenarioSearchFilterEnabled, scenarioSearchMatchSet]);
+            const scenarioDeadlineAtRisk = scenarioLateItems.length > 0;
+            const scenarioCriticalPathItems = React.useMemo(() => {
+                return (scenarioSummary.critical_path || []).filter(key => (
+                    !scenarioExcludedIssueKeys.has(key)
+                    && (!scenarioSearchFilterEnabled || scenarioSearchMatchSet.has(key))
+                ));
+            }, [scenarioSummary, scenarioExcludedIssueKeys, scenarioSearchFilterEnabled, scenarioSearchMatchSet]);
+            const scenarioUnschedulableItems = React.useMemo(() => {
+                return (scenarioSummary.unschedulable || []).filter(key => (
+                    !scenarioExcludedIssueKeys.has(key)
+                    && (!scenarioSearchFilterEnabled || scenarioSearchMatchSet.has(key))
+                ));
+            }, [scenarioSummary, scenarioExcludedIssueKeys, scenarioSearchFilterEnabled, scenarioSearchMatchSet]);
+            const scenarioBottleneckLanes = React.useMemo(() => {
+                const lanes = scenarioSummary.bottleneck_lanes || [];
+                return lanes.filter(lane => {
+                    const laneInfo = scenarioLaneInfo.get(lane);
+                    if (!laneInfo) return true;
+                    return (laneInfo.lateCount || laneInfo.unschedulableCount);
+                });
+            }, [scenarioSummary, scenarioLaneInfo]);
             const scenarioLanes = React.useMemo(() => {
-                const lanes = scenarioIssues.map(issue => issue.lane || 'Unassigned');
-                return Array.from(new Set(lanes)).sort((a, b) => a.localeCompare(b));
-            }, [scenarioIssues]);
+                const lanes = Array.from(scenarioLaneInfo.keys());
+                return lanes.sort((a, b) => a.localeCompare(b));
+            }, [scenarioLaneInfo]);
             const scenarioIssuesByLane = React.useMemo(() => {
                 const groups = new Map();
-                scenarioIssues.forEach(issue => {
-                    const lane = issue.lane || 'Unassigned';
+                scenarioTimelineIssues.forEach(issue => {
+                    const lane = scenarioLaneForIssue(issue);
                     if (!groups.has(lane)) {
                         groups.set(lane, []);
                     }
                     groups.get(lane).push(issue);
                 });
                 groups.forEach(list => {
-                    list.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''));
+                    list.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
                 });
                 return groups;
+            }, [scenarioTimelineIssues, scenarioLaneMode, scenarioEpicFocus]);
+            const scenarioHasAssignees = React.useMemo(() => {
+                return scenarioIssues.some(issue => issue.assignee);
             }, [scenarioIssues]);
             const scenarioUnschedulable = React.useMemo(() => {
-                return scenarioIssues.filter(issue => !issue.start_date || !issue.end_date);
+                return scenarioIssues.filter(issue => !issue.start || !issue.end);
             }, [scenarioIssues]);
             const scenarioTicks = React.useMemo(() => {
-                if (!scenarioStart || !scenarioEnd) return [];
-                const totalMs = Math.max(1, scenarioEnd - scenarioStart);
+                if (!scenarioViewStart || !scenarioViewEnd) return [];
+                const totalMs = Math.max(1, scenarioViewEnd - scenarioViewStart);
                 const steps = 4;
                 return Array.from({ length: steps + 1 }, (_, idx) => {
                     const ratio = idx / steps;
-                    const date = new Date(scenarioStart.getTime() + totalMs * ratio);
+                    const date = new Date(scenarioViewStart.getTime() + totalMs * ratio);
                     return {
                         label: date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }),
                         ratio
                     };
                 });
-            }, [scenarioStart, scenarioEnd]);
-            const SCENARIO_LANE_HEIGHT = 44;
-            const SCENARIO_BAR_HEIGHT = 26;
+            }, [scenarioViewStart, scenarioViewEnd]);
+            const scenarioQuarterMarkers = React.useMemo(() => {
+                if (!scenarioViewStart || !scenarioViewEnd) return [];
+                const markers = [];
+                const start = new Date(scenarioViewStart.getTime());
+                const end = new Date(scenarioViewEnd.getTime());
+                const startQuarter = Math.floor(start.getMonth() / 3);
+                let quarterStart = new Date(start.getFullYear(), startQuarter * 3, 1);
+                if (quarterStart < start) {
+                    const nextQuarter = startQuarter + 1;
+                    const year = start.getFullYear() + Math.floor(nextQuarter / 4);
+                    const month = (nextQuarter % 4) * 3;
+                    quarterStart = new Date(year, month, 1);
+                }
+                let cursor = quarterStart;
+                while (cursor <= end) {
+                    const ratio = (cursor - scenarioViewStart) / Math.max(1, scenarioViewEnd - scenarioViewStart);
+                    if (ratio >= 0 && ratio <= 1) {
+                        markers.push({
+                            date: new Date(cursor.getTime()),
+                            ratio
+                        });
+                    }
+                    const nextMonth = cursor.getMonth() + 3;
+                    cursor = new Date(cursor.getFullYear() + Math.floor(nextMonth / 12), nextMonth % 12, 1);
+                }
+                return markers;
+            }, [scenarioViewStart, scenarioViewEnd]);
+            const SCENARIO_LANE_HEIGHT = 52;
+            const SCENARIO_BAR_HEIGHT = 32;
+            const SCENARIO_BAR_GAP = 10;
+            const SCENARIO_COLLAPSED_ROWS = 2;
+            const SCENARIO_TEAM_LEAD_ROWS = 1;
+            const scenarioBarGap = scenarioEpicFocus ? 16 : SCENARIO_BAR_GAP;
+            const scenarioLaneStacking = React.useMemo(() => {
+                const rowIndexByKey = new Map();
+                const laneRowCounts = new Map();
+                const laneVisibleRows = new Map();
+                const laneHiddenCounts = new Map();
+                const fallbackStart = scenarioViewStart || new Date(0);
+                const DAY_MS = 24 * 60 * 60 * 1000;
+                const assignRows = (issueList, rowEnds, baseOffset) => {
+                    issueList.forEach((issue) => {
+                        if (!issue?.key) return;
+                        const isUnscheduled = !issue.start || !issue.end;
+                        const start = parseScenarioDate(issue.start) || fallbackStart;
+                        const end = parseScenarioDate(issue.end) || start;
+                        const normalizedEnd = end < start
+                            ? start
+                            : (isUnscheduled ? new Date(start.getTime() + DAY_MS) : end);
+                        let rowIndex = rowEnds.findIndex(rowEnd => (
+                            isUnscheduled ? start > rowEnd : start >= rowEnd
+                        ));
+                        if (rowIndex === -1) {
+                            rowIndex = rowEnds.length;
+                            rowEnds.push(normalizedEnd);
+                        } else {
+                            rowEnds[rowIndex] = normalizedEnd;
+                        }
+                        rowIndexByKey.set(issue.key, baseOffset + rowIndex);
+                    });
+                };
+                scenarioLanes.forEach((lane) => {
+                    const issues = scenarioIssuesByLane.get(lane) || [];
+                    const rowEnds = [];
+                    const capacitySize = scenarioLaneMode === 'team'
+                        ? Number(scenarioCapacityByTeam[lane || '']?.size)
+                        : null;
+                    const capacityRows = Number.isFinite(capacitySize) && capacitySize > 0
+                        ? Math.max(1, Math.round(capacitySize) + SCENARIO_TEAM_LEAD_ROWS)
+                        : null;
+                    const regularIssues = [];
+                    const excludedIssues = [];
+                    issues.forEach((issue) => {
+                        if (!issue?.key) return;
+                        if (scenarioExcludedIssueKeys.has(issue.key)) {
+                            excludedIssues.push(issue);
+                        } else {
+                            regularIssues.push(issue);
+                        }
+                    });
+                    assignRows(regularIssues, rowEnds, 0);
+                    const excludedRowEnds = [];
+                    assignRows(excludedIssues, excludedRowEnds, rowEnds.length);
+                    const totalRows = Math.max(1, rowEnds.length + excludedRowEnds.length, capacityRows || 0);
+                    const isCollapsed = scenarioEpicFocus ? false : Boolean(scenarioCollapsedLanes[lane]);
+                    const collapsedRows = scenarioLaneMode === 'epic'
+                        ? 1
+                        : (scenarioLaneMode === 'team' && capacityRows
+                            ? Math.max(SCENARIO_COLLAPSED_ROWS, capacityRows)
+                            : SCENARIO_COLLAPSED_ROWS);
+                    const visibleRows = isCollapsed
+                        ? Math.min(collapsedRows, totalRows)
+                        : totalRows;
+                    laneRowCounts.set(lane, totalRows);
+                    laneVisibleRows.set(lane, Math.max(1, visibleRows));
+                    laneHiddenCounts.set(lane, Math.max(0, totalRows - visibleRows));
+                });
+                return { rowIndexByKey, laneRowCounts, laneVisibleRows, laneHiddenCounts };
+            }, [
+                scenarioLanes,
+                scenarioIssuesByLane,
+                scenarioViewStart,
+                scenarioCollapsedLanes,
+                scenarioLaneMode,
+                scenarioCapacityByTeam,
+                scenarioExcludedIssueKeys,
+                isAllTeamsSelected,
+                scenarioEpicFocus
+            ]);
+            const scenarioLaneMeta = React.useMemo(() => {
+                const meta = new Map();
+                let offset = 0;
+                scenarioLanes.forEach((lane) => {
+                    const totalRows = scenarioLaneStacking.laneRowCounts.get(lane) || 1;
+                    const visibleRows = scenarioLaneStacking.laneVisibleRows.get(lane) || 1;
+                    const hiddenCount = scenarioLaneStacking.laneHiddenCounts.get(lane) || 0;
+                    const shouldCollapse = Boolean(scenarioCollapsedLanes[lane]);
+                    const isCollapsed = scenarioEpicFocus?.key === lane ? false : shouldCollapse;
+                    const rowCount = Math.max(1, visibleRows);
+                    const height = rowCount * (SCENARIO_BAR_HEIGHT + scenarioBarGap) + scenarioBarGap;
+                    meta.set(lane, { offset, height, rowCount, collapsed: isCollapsed, hiddenCount, totalRows });
+                    offset += height;
+                });
+                return { meta, totalHeight: offset };
+            }, [scenarioLanes, scenarioLaneStacking, scenarioCollapsedLanes, scenarioEpicFocus, scenarioBarGap]);
+
+            useEffect(() => {
+                if (scenarioSkipAutoCollapseRef.current) {
+                    scenarioSkipAutoCollapseRef.current = false;
+                    return;
+                }
+                if (scenarioLaneMode === 'team' && isAllTeamsSelected) {
+                    if (!scenarioTeamCollapseInitRef.current) {
+                        const next = {};
+                        scenarioLanes.forEach(lane => {
+                            next[lane] = true;
+                        });
+                        setScenarioCollapsedLanes(next);
+                        scenarioTeamCollapseInitRef.current = true;
+                    }
+                    return;
+                }
+                scenarioTeamCollapseInitRef.current = false;
+                if (scenarioLaneMode !== 'epic') {
+                    setScenarioCollapsedLanes({});
+                    return;
+                }
+                const next = {};
+                scenarioLanes.forEach(lane => {
+                    next[lane] = true;
+                });
+                scenarioIssues.forEach(issue => {
+                    if (scenarioFocusSet.size === 0 || scenarioFocusSet.has(issue.key) || scenarioContextSet.has(issue.key)) {
+                        next[scenarioLaneForIssue(issue)] = false;
+                    }
+                });
+                setScenarioCollapsedLanes(next);
+            }, [scenarioLaneMode, scenarioLanes, scenarioIssues, scenarioFocusSet, scenarioContextSet, isAllTeamsSelected]);
+
+            useEffect(() => {
+                scenarioTeamCollapseInitRef.current = false;
+            }, [scenarioData]);
 
             useEffect(() => {
                 if (!showScenario || !scenarioTimelineRef.current) return;
-                const updateLayout = () => {
-                    const container = scenarioTimelineRef.current;
+                const container = scenarioTimelineRef.current;
+                const readLayout = () => {
                     const track = container.querySelector('.scenario-lane-track');
-                    const trackWidth = track ? track.clientWidth : 0;
-                    const labelWidth = 180;
-                    const height = scenarioLanes.length * SCENARIO_LANE_HEIGHT;
+                    const labelWidth = 190;
+                    const trackWidth = track ? track.clientWidth : Math.max(0, container.clientWidth - labelWidth);
+                    let height = scenarioLaneMeta.totalHeight || scenarioLanes.length * SCENARIO_LANE_HEIGHT;
                     setScenarioLayout({
                         width: trackWidth,
                         height,
                         labelWidth
                     });
+                    scheduleScenarioEdgeUpdate();
                 };
-                updateLayout();
-                window.addEventListener('resize', updateLayout);
-                return () => window.removeEventListener('resize', updateLayout);
-            }, [showScenario, scenarioLanes.length, scenarioData]);
+                const readScroll = () => {
+                    const nextTop = container.scrollTop || 0;
+                    const nextHeight = container.clientHeight || 0;
+                    setScenarioScrollTop(prev => (prev === nextTop ? prev : nextTop));
+                    setScenarioViewportHeight(prev => (prev === nextHeight ? prev : nextHeight));
+                    scheduleScenarioEdgeUpdate();
+                };
+                const scheduleLayout = () => {
+                    if (scenarioResizeFrameRef.current) return;
+                    scenarioResizeFrameRef.current = window.requestAnimationFrame(() => {
+                        scenarioResizeFrameRef.current = null;
+                        if (!scenarioTimelineRef.current) return;
+                        readLayout();
+                    });
+                };
+                const scheduleScroll = () => {
+                    if (scenarioScrollFrameRef.current) return;
+                    scenarioScrollFrameRef.current = window.requestAnimationFrame(() => {
+                        scenarioScrollFrameRef.current = null;
+                        if (!scenarioTimelineRef.current) return;
+                        readScroll();
+                    });
+                };
+                scheduleLayout();
+                scheduleScroll();
+                container.addEventListener('scroll', scheduleScroll, { passive: true });
+                window.addEventListener('resize', scheduleLayout);
+                window.addEventListener('resize', scheduleScroll);
+                return () => {
+                    container.removeEventListener('scroll', scheduleScroll);
+                    window.removeEventListener('resize', scheduleLayout);
+                    window.removeEventListener('resize', scheduleScroll);
+                    if (scenarioScrollFrameRef.current) {
+                        window.cancelAnimationFrame(scenarioScrollFrameRef.current);
+                        scenarioScrollFrameRef.current = null;
+                    }
+                    if (scenarioResizeFrameRef.current) {
+                        window.cancelAnimationFrame(scenarioResizeFrameRef.current);
+                        scenarioResizeFrameRef.current = null;
+                    }
+                };
+            }, [showScenario, scenarioLanes.length, scenarioData, scenarioLaneMode, scenarioIssuesByLane, scenarioLaneMeta, scheduleScenarioEdgeUpdate]);
+
+            useEffect(() => {
+                scheduleScenarioEdgeUpdate();
+            }, [
+                scenarioLaneMode,
+                scenarioCollapsedLanes,
+                scenarioRangeOverride,
+                scenarioEpicFocus,
+                scenarioLayout.width,
+                scenarioLayout.height,
+                scenarioLaneStacking,
+                scheduleScenarioEdgeUpdate
+            ]);
+
+            useEffect(() => {
+                if (!showScenario) return;
+                scheduleScenarioEdgeUpdate();
+            }, [showScenario, scenarioPositions, scenarioVisibleLanes, scheduleScenarioEdgeUpdate]);
+
+            useEffect(() => {
+                scheduleScenarioEdgeUpdate();
+            }, [
+                scenarioHoverKey,
+                scenarioBaselineEdges,
+                scenarioFocusEdges,
+                scenarioActiveEdges,
+                scenarioTimelineIssueKeys,
+                scheduleScenarioEdgeUpdate
+            ]);
 
             const scenarioPositions = React.useMemo(() => {
-                if (!scenarioStart || !scenarioEnd) return {};
+                if (!scenarioViewStart || !scenarioViewEnd) return {};
                 if (!scenarioLayout.width) return {};
-                const totalMs = Math.max(1, scenarioEnd - scenarioStart);
-                const laneIndex = new Map(scenarioLanes.map((lane, idx) => [lane, idx]));
+                const totalMs = Math.max(1, scenarioViewEnd - scenarioViewStart);
                 const positions = {};
-                scenarioIssues.forEach(issue => {
-                    if (!issue.start_date || !issue.end_date) return;
-                    const start = parseScenarioDate(issue.start_date);
-                    const end = parseScenarioDate(issue.end_date);
+                scenarioTimelineIssues.forEach((issue) => {
+                    const lane = scenarioLaneForIssue(issue);
+                    const laneMeta = scenarioLaneMeta.meta.get(lane);
+                    if (!laneMeta) return;
+                    const rowIndex = scenarioLaneStacking.rowIndexByKey.get(issue.key) ?? 0;
+                    const visibleRows = scenarioLaneStacking.laneVisibleRows.get(lane) || 1;
+                    if (rowIndex >= visibleRows) return;
+                    const y = laneMeta.offset + scenarioBarGap + rowIndex * (SCENARIO_BAR_HEIGHT + scenarioBarGap);
+                    if (!issue.start || !issue.end) {
+                        const width = Math.min(80, scenarioLayout.width * 0.12);
+                        positions[issue.key] = {
+                            xStart: 0,
+                            xEnd: width,
+                            y,
+                            height: SCENARIO_BAR_HEIGHT,
+                            lane
+                        };
+                        return;
+                    }
+                    const start = parseScenarioDate(issue.start);
+                    const end = parseScenarioDate(issue.end);
                     if (!start || !end) return;
-                    const lane = issue.lane || 'Unassigned';
-                    const idx = laneIndex.get(lane) ?? 0;
-                    const startRatio = Math.max(0, (start - scenarioStart) / totalMs);
-                    const endRatio = Math.min(1, (end - scenarioStart) / totalMs);
+                    const startRatio = Math.max(0, (start - scenarioViewStart) / totalMs);
+                    const endRatio = Math.min(1, (end - scenarioViewStart) / totalMs);
                     const xStart = startRatio * scenarioLayout.width;
                     const xEnd = Math.max(xStart + 6, endRatio * scenarioLayout.width);
-                    const y = idx * SCENARIO_LANE_HEIGHT + SCENARIO_LANE_HEIGHT / 2;
-                    positions[issue.key] = { xStart, xEnd, y };
+                    positions[issue.key] = {
+                        xStart,
+                        xEnd,
+                        y,
+                        height: SCENARIO_BAR_HEIGHT,
+                        lane
+                    };
                 });
                 return positions;
-            }, [scenarioIssues, scenarioStart, scenarioEnd, scenarioLayout, scenarioLanes]);
+            }, [
+                scenarioTimelineIssues,
+                scenarioViewStart,
+                scenarioViewEnd,
+                scenarioLayout,
+                scenarioLanes,
+                scenarioLaneMeta,
+                scenarioBarGap,
+                scenarioLaneStacking
+            ]);
 
-            const scenarioEdges = React.useMemo(() => {
+            const scenarioEdgeCandidates = React.useMemo(() => {
+                return (scenarioDependencies || []).filter(edge =>
+                    edge?.from &&
+                    edge?.to &&
+                    scenarioTimelineIssueKeys.has(edge.from) &&
+                    scenarioTimelineIssueKeys.has(edge.to)
+                );
+            }, [scenarioDependencies, scenarioTimelineIssueKeys]);
+
+            const scenarioEdgeIndex = React.useMemo(() => {
+                const incoming = new Map();
+                const outgoing = new Map();
+                scenarioEdgeCandidates.forEach(edge => {
+                    if (!incoming.has(edge.to)) {
+                        incoming.set(edge.to, new Set());
+                    }
+                    if (!outgoing.has(edge.from)) {
+                        outgoing.set(edge.from, new Set());
+                    }
+                    incoming.get(edge.to).add(edge.from);
+                    outgoing.get(edge.from).add(edge.to);
+                });
+                return { incoming, outgoing };
+            }, [scenarioEdgeCandidates]);
+
+            const scenarioEpicBars = React.useMemo(() => {
+                if (scenarioLaneMode !== 'epic') return [];
+                if (!scenarioViewStart || !scenarioViewEnd) return [];
+                const bars = [];
+                const totalMs = Math.max(1, scenarioViewEnd - scenarioViewStart);
+                scenarioLanes.forEach((lane) => {
+                    const laneIssues = scenarioIssuesByLane.get(lane) || [];
+                    const epicGroups = new Map();
+                    laneIssues.forEach((issue) => {
+                        const epicKey = issue.epicKey;
+                        if (!epicKey) return;
+                        if (!epicGroups.has(epicKey)) {
+                            epicGroups.set(epicKey, []);
+                        }
+                        epicGroups.get(epicKey).push(issue);
+                    });
+                    epicGroups.forEach((issues, epicKey) => {
+                        if (scenarioEpicFocus?.key && epicKey !== scenarioEpicFocus.key) return;
+                        let start = null;
+                        let end = null;
+                        let storyPoints = 0;
+                        issues.forEach((issue) => {
+                            const startDate = parseScenarioDate(issue.start);
+                            const endDate = parseScenarioDate(issue.end);
+                            if (!startDate || !endDate) return;
+                            if (!start || startDate < start) start = startDate;
+                            if (!end || endDate > end) end = endDate;
+                            if (Number.isFinite(issue.sp)) {
+                                storyPoints += Number(issue.sp);
+                            }
+                        });
+                        if (!start || !end) return;
+                        const startRatio = Math.max(0, (start - scenarioViewStart) / totalMs);
+                        const endRatio = Math.min(1, (end - scenarioViewStart) / totalMs);
+                        const xStart = startRatio * scenarioLayout.width;
+                        const xEnd = Math.max(xStart + 6, endRatio * scenarioLayout.width);
+                        const laneMeta = scenarioLaneMeta.meta.get(lane) || { offset: 0, height: SCENARIO_LANE_HEIGHT };
+                        bars.push({
+                            lane,
+                            epicKey,
+                            epicSummary: scenarioIssueByKey.get(issues[0].key)?.epicSummary,
+                            storyPoints,
+                            xStart,
+                            xEnd,
+                            y: laneMeta.offset + 3,
+                            height: laneMeta.height - 6,
+                            isExcluded: excludedEpicSet.has(epicKey)
+                        });
+                    });
+                });
+                return bars;
+            }, [scenarioIssuesByLane, scenarioLanes, scenarioLaneMode, scenarioViewStart, scenarioViewEnd, scenarioLayout, scenarioLaneMeta, scenarioIssueByKey, scenarioEpicFocus, excludedEpicSet]);
+
+            const scenarioEpicEdges = React.useMemo(() => {
+                if (scenarioLaneMode !== 'epic' || scenarioEpicFocus) return [];
+                const grouped = new Map();
+                (scenarioDependencies || []).forEach(edge => {
+                    const fromIssue = scenarioIssueByKey.get(edge.from);
+                    const toIssue = scenarioIssueByKey.get(edge.to);
+                    if (!fromIssue || !toIssue) return;
+                    const fromEpic = fromIssue.epicKey || 'No Epic';
+                    const toEpic = toIssue.epicKey || 'No Epic';
+                    if (fromEpic === toEpic) return;
+                    const key = `${fromEpic}::${toEpic}`;
+                    const current = grouped.get(key) || { fromEpic, toEpic, count: 0 };
+                    current.count += 1;
+                    grouped.set(key, current);
+                });
                 const edges = [];
-                Object.entries(scenarioDependencies || {}).forEach(([issueKey, deps]) => {
-                    (deps || []).forEach(dep => {
-                        if (!scenarioPositions[issueKey] || !scenarioPositions[dep]) return;
-                        edges.push({ from: dep, to: issueKey });
+                grouped.forEach((entry) => {
+                    const fromMeta = scenarioLaneMeta.meta.get(entry.fromEpic);
+                    const toMeta = scenarioLaneMeta.meta.get(entry.toEpic);
+                    if (!fromMeta || !toMeta) return;
+                    edges.push({
+                        fromEpic: entry.fromEpic,
+                        toEpic: entry.toEpic,
+                        count: entry.count,
+                        y1: fromMeta.offset + fromMeta.height / 2,
+                        y2: toMeta.offset + toMeta.height / 2,
                     });
                 });
                 return edges;
-            }, [scenarioDependencies, scenarioPositions]);
+            }, [scenarioDependencies, scenarioLaneMeta, scenarioLaneMode, scenarioIssueByKey]);
 
             const scenarioDeadlineLeft = React.useMemo(() => {
-                if (!scenarioStart || !scenarioEnd || !scenarioDeadline) return 0;
+                if (!scenarioViewStart || !scenarioViewEnd || !scenarioDeadline) return 0;
                 if (!scenarioLayout.width) return 0;
-                const totalMs = Math.max(1, scenarioEnd - scenarioStart);
-                const ratio = Math.max(0, Math.min(1, (scenarioDeadline - scenarioStart) / totalMs));
+                const totalMs = Math.max(1, scenarioViewEnd - scenarioViewStart);
+                const ratio = Math.max(0, Math.min(1, (scenarioDeadline - scenarioViewStart) / totalMs));
                 return scenarioLayout.labelWidth + scenarioLayout.width * ratio;
-            }, [scenarioStart, scenarioEnd, scenarioDeadline, scenarioLayout]);
+            }, [scenarioViewStart, scenarioViewEnd, scenarioDeadline, scenarioLayout]);
+
+            const scenarioVisibleLanes = React.useMemo(() => {
+                if (!scenarioViewportHeight) return scenarioLanes;
+                const buffer = 80;
+                const start = scenarioScrollTop - buffer;
+                const end = scenarioScrollTop + scenarioViewportHeight + buffer;
+                return scenarioLanes.filter(lane => {
+                    const meta = scenarioLaneMeta.meta.get(lane);
+                    if (!meta) return false;
+                    return meta.offset + meta.height >= start && meta.offset <= end;
+                });
+            }, [scenarioLanes, scenarioLaneMeta, scenarioScrollTop, scenarioViewportHeight]);
+
+            const scenarioActiveEdges = React.useMemo(() => {
+                if (!scenarioHoverKey) return [];
+                return scenarioEdgeCandidates.filter(edge => edge.from === scenarioHoverKey || edge.to === scenarioHoverKey);
+            }, [scenarioEdgeCandidates, scenarioHoverKey]);
+
+            const scenarioUpstreamSet = React.useMemo(() => {
+                if (!scenarioHoverKey) return new Set();
+                return new Set(scenarioEdgeIndex.incoming.get(scenarioHoverKey) || []);
+            }, [scenarioHoverKey, scenarioEdgeIndex]);
+
+            const scenarioDownstreamSet = React.useMemo(() => {
+                if (!scenarioHoverKey) return new Set();
+                return new Set(scenarioEdgeIndex.outgoing.get(scenarioHoverKey) || []);
+            }, [scenarioHoverKey, scenarioEdgeIndex]);
+
+            const scenarioBlockedSet = React.useMemo(() => {
+                const blocked = new Set();
+                (scenarioDependencies || []).forEach(edge => {
+                    if (edge.type === 'block' && edge.to) {
+                        blocked.add(edge.to);
+                    }
+                });
+                return blocked;
+            }, [scenarioDependencies]);
+
+            const scenarioIsSingleTeamFocus = !isAllTeamsSelected && selectedTeamSet.size === 1;
+            const scenarioBaselineEdges = React.useMemo(() => {
+                const focusKeys = scenarioFocusSet.size ? scenarioFocusSet : new Set(scenarioTimelineIssues.map(issue => issue.key));
+                if (!scenarioIsSingleTeamFocus && focusKeys.size > 10) return [];
+                return scenarioEdgeCandidates.filter(edge => focusKeys.has(edge.from) || focusKeys.has(edge.to));
+            }, [scenarioFocusSet, scenarioEdgeCandidates, scenarioTimelineIssues, scenarioIsSingleTeamFocus]);
+
+            const scenarioFocusEdges = React.useMemo(() => {
+                if (!scenarioEpicFocus) return [];
+                const inside = [];
+                const context = [];
+                scenarioEdgeCandidates.forEach(edge => {
+                    const fromIn = scenarioFocusIssueKeys.has(edge.from);
+                    const toIn = scenarioFocusIssueKeys.has(edge.to);
+                    if (fromIn && toIn) {
+                        inside.push(edge);
+                        return;
+                    }
+                    const fromContext = scenarioFocusContextKeys.has(edge.from);
+                    const toContext = scenarioFocusContextKeys.has(edge.to);
+                    if ((fromIn && toContext) || (toIn && fromContext)) {
+                        context.push(edge);
+                    }
+                });
+                return [...context, ...inside];
+            }, [scenarioEpicFocus, scenarioEdgeCandidates, scenarioFocusIssueKeys, scenarioFocusContextKeys]);
+
+
+            const toggleScenarioLane = (lane) => {
+                setScenarioCollapsedLanes(prev => ({
+                    ...prev,
+                    [lane]: !prev?.[lane]
+                }));
+            };
+
+            const buildScenarioTooltipPayload = (summary, key, sp, isExcluded = false) => {
+                const cleanedSummary = normalizeScenarioSummary(summary) || key || '';
+                const hasSp = sp !== null && sp !== undefined && sp !== '';
+                const spValue = hasSp ? Number(sp) : null;
+                return {
+                    summary: cleanedSummary,
+                    key: key || '',
+                    sp: Number.isFinite(spValue) ? spValue : null,
+                    note: isExcluded ? 'Excluded (capacity noise)' : ''
+                };
+            };
+
+            const computeScenarioTooltipPosition = (anchor) => {
+                const fallback = { width: 240, height: 56 };
+                const tooltipNode = scenarioTooltipRef.current;
+                const measured = tooltipNode?.getBoundingClientRect?.();
+                const tooltipWidth = measured?.width || fallback.width;
+                const tooltipHeight = measured?.height || fallback.height;
+                const rect = anchor?.getBoundingClientRect ? anchor.getBoundingClientRect() : anchor;
+                if (!rect) {
+                    return { x: 0, y: 0 };
+                }
+                const padding = 12;
+                const offset = 10;
+                let x = rect.right + offset;
+                let y = rect.top - tooltipHeight - offset;
+                if (y < padding) {
+                    y = rect.bottom + offset;
+                }
+                if (x + tooltipWidth > window.innerWidth - padding) {
+                    x = rect.left - tooltipWidth - offset;
+                }
+                if (x < padding) {
+                    x = padding;
+                }
+                if (y + tooltipHeight > window.innerHeight - padding) {
+                    y = Math.max(padding, window.innerHeight - padding - tooltipHeight);
+                }
+                return { x, y };
+            };
+
+            const showScenarioTooltip = (event, payload) => {
+                if (!payload) return;
+                const anchor = event?.currentTarget;
+                scenarioTooltipAnchorRef.current = anchor || null;
+                const anchorRect = anchor?.getBoundingClientRect ? anchor.getBoundingClientRect() : null;
+                const position = computeScenarioTooltipPosition(anchorRect || {
+                    left: event.clientX,
+                    right: event.clientX,
+                    top: event.clientY,
+                    bottom: event.clientY,
+                    width: 0,
+                    height: 0
+                });
+                setScenarioTooltip({
+                    ...payload,
+                    visible: true,
+                    x: position.x,
+                    y: position.y
+                });
+            };
+
+            const showScenarioTooltipFromElement = (element, payload) => {
+                if (!element || !payload) return;
+                scenarioTooltipAnchorRef.current = element;
+                const rect = element.getBoundingClientRect();
+                const position = computeScenarioTooltipPosition(rect);
+                setScenarioTooltip({
+                    ...payload,
+                    visible: true,
+                    x: position.x,
+                    y: position.y
+                });
+            };
+
+            const moveScenarioTooltip = () => {
+                const anchor = scenarioTooltipAnchorRef.current;
+                if (!anchor) return;
+                setScenarioTooltip(prev => {
+                    if (!prev.visible) return prev;
+                    const position = computeScenarioTooltipPosition(anchor);
+                    if (position.x === prev.x && position.y === prev.y) return prev;
+                    return {
+                        ...prev,
+                        x: position.x,
+                        y: position.y
+                    };
+                });
+            };
+
+            const hideScenarioTooltip = () => {
+                scenarioTooltipAnchorRef.current = null;
+                setScenarioTooltip(prev => (prev.visible ? { ...prev, visible: false } : prev));
+            };
+
+            const computeScenarioEdgePaths = React.useCallback(() => {
+                const container = scenarioTimelineRef.current;
+                if (!container) {
+                    return { width: 0, height: 0, paths: [] };
+                }
+                const containerRect = container.getBoundingClientRect();
+                const scrollLeft = container.scrollLeft || 0;
+                const scrollTop = container.scrollTop || 0;
+                const visibleRects = new Map();
+                const visibleKeys = new Set();
+                scenarioIssueRefMap.current.forEach((node, key) => {
+                    if (!node || !node.getBoundingClientRect) return;
+                    const rect = node.getBoundingClientRect();
+                    visibleRects.set(key, {
+                        x: rect.left - containerRect.left + scrollLeft,
+                        y: rect.top - containerRect.top + scrollTop,
+                        width: rect.width,
+                        height: rect.height
+                    });
+                    visibleKeys.add(key);
+                });
+
+                const lanes = container.querySelector('.scenario-lanes');
+                const track = container.querySelector('.scenario-lane-track');
+                const lanesRect = lanes ? lanes.getBoundingClientRect() : null;
+                const trackRect = track ? track.getBoundingClientRect() : null;
+                const lanesTop = lanesRect ? lanesRect.top - containerRect.top + scrollTop : 0;
+                const trackLeft = trackRect ? trackRect.left - containerRect.left + scrollLeft : (scenarioLayout.labelWidth || 0);
+
+                const getFallbackRect = (issueKey) => {
+                    const pos = scenarioPositions[issueKey];
+                    if (!pos) return null;
+                    return {
+                        x: trackLeft + pos.xStart,
+                        y: lanesTop + pos.y,
+                        width: Math.max(2, pos.xEnd - pos.xStart),
+                        height: pos.height
+                    };
+                };
+
+                const baseEdges = scenarioHoverKey
+                    ? (scenarioEpicFocus ? scenarioFocusEdges : scenarioEdgeCandidates)
+                    : (scenarioEpicFocus ? scenarioFocusEdges : scenarioBaselineEdges);
+                const edgeMap = new Map();
+                baseEdges.forEach(edge => {
+                    edgeMap.set(`${edge.from}-${edge.to}-${edge.type || 'link'}`, edge);
+                });
+                if (scenarioHoverKey) {
+                    scenarioActiveEdges.forEach(edge => {
+                        edgeMap.set(`${edge.from}-${edge.to}-${edge.type || 'link'}`, edge);
+                    });
+                }
+
+                const paths = [];
+                edgeMap.forEach((edge) => {
+                    const fromVisible = visibleKeys.has(edge.from);
+                    const toVisible = visibleKeys.has(edge.to);
+                    if (!fromVisible && !toVisible) return;
+                    const fromRect = visibleRects.get(edge.from) || getFallbackRect(edge.from);
+                    const toRect = visibleRects.get(edge.to) || getFallbackRect(edge.to);
+                    if (!fromRect || !toRect) return;
+                    const fromInFocus = scenarioEpicFocus && scenarioFocusIssueKeys.has(edge.from);
+                    const toInFocus = scenarioEpicFocus && scenarioFocusIssueKeys.has(edge.to);
+                    if (scenarioEpicFocus && !fromInFocus && !toInFocus) {
+                        return;
+                    }
+                    const startX = fromRect.x + fromRect.width;
+                    const endX = toRect.x;
+                    const startY = fromRect.y + fromRect.height / 2;
+                    const endY = toRect.y + toRect.height / 2;
+                    const dx = endX - startX;
+                    let c1x;
+                    let c2x;
+                    if (dx >= 0) {
+                        const curve = Math.min(140, Math.max(20, dx * 0.5));
+                        const safeCurve = Math.min(curve, Math.max(10, dx));
+                        c1x = startX + safeCurve;
+                        c2x = endX - safeCurve;
+                    } else {
+                        const overlap = Math.abs(dx);
+                        const curve = Math.min(200, Math.max(60, overlap * 0.8));
+                        const midX = Math.min(container.scrollWidth || container.clientWidth, startX + curve);
+                        c1x = midX;
+                        c2x = midX;
+                    }
+                    const isActive = scenarioHoverKey && (edge.from === scenarioHoverKey || edge.to === scenarioHoverKey);
+                    const isFaded = scenarioHoverKey && !isActive;
+                    const isContextEdge = !isActive && scenarioEpicFocus && ((fromInFocus && !toInFocus) || (!fromInFocus && toInFocus));
+                    paths.push({
+                        id: `${edge.from}-${edge.to}-${edge.type || 'link'}`,
+                        d: `M ${startX} ${startY} C ${c1x} ${startY}, ${c2x} ${endY}, ${endX} ${endY}`,
+                        type: edge.type,
+                        isActive,
+                        isFaded,
+                        isContextEdge
+                    });
+                });
+                return {
+                    width: container.scrollWidth || container.clientWidth,
+                    height: container.scrollHeight || container.clientHeight,
+                    paths
+                };
+            }, [
+                scenarioTimelineIssueKeys,
+                scenarioEpicFocus,
+                scenarioEdgeCandidates,
+                scenarioFocusEdges,
+                scenarioBaselineEdges,
+                scenarioActiveEdges,
+                scenarioHoverKey,
+                scenarioFocusIssueKeys,
+                scenarioPositions,
+                scenarioLayout.labelWidth
+            ]);
+
+            const clearScenarioEpicFocus = () => {
+                if (!scenarioEpicFocus) return;
+                const restore = scenarioFocusRestoreRef.current;
+                setScenarioEpicFocus(null);
+                hideScenarioTooltip();
+                setScenarioRangeOverride(restore?.rangeOverride || null);
+                if (restore?.laneMode === 'epic') {
+                    scenarioSkipAutoCollapseRef.current = true;
+                }
+                if (restore?.laneMode && restore.laneMode !== scenarioLaneMode) {
+                    setScenarioLaneMode(restore.laneMode);
+                }
+                if (restore?.collapsedLanes) {
+                    setScenarioCollapsedLanes(restore.collapsedLanes);
+                }
+                if (scenarioTimelineRef.current && typeof restore?.scrollTop === 'number') {
+                    scenarioTimelineRef.current.scrollTo({ top: restore.scrollTop, behavior: 'auto' });
+                }
+                scenarioFocusRestoreRef.current = null;
+            };
+
+            const focusScenarioEpic = (epicKey, epicSummary) => {
+                if (!epicKey) return;
+                if (scenarioEpicFocus?.key === epicKey) {
+                    clearScenarioEpicFocus();
+                    return;
+                }
+                if (!scenarioEpicFocus) {
+                    scenarioFocusRestoreRef.current = {
+                        laneMode: scenarioLaneMode,
+                        collapsedLanes: { ...scenarioCollapsedLanes },
+                        scrollTop: scenarioTimelineRef.current?.scrollTop || 0,
+                        rangeOverride: scenarioRangeOverride
+                    };
+                }
+                const cleanedSummary = normalizeScenarioSummary(epicSummary) || epicKey;
+                setScenarioEpicFocus({ key: epicKey, summary: cleanedSummary });
+                if (scenarioLaneMode !== 'epic') {
+                    setScenarioLaneMode('epic');
+                }
+                const DAY_MS = 24 * 60 * 60 * 1000;
+                let minStart = null;
+                let maxEnd = null;
+                scenarioIssues.forEach(issue => {
+                    if (issue.epicKey !== epicKey) return;
+                    const start = parseScenarioDate(issue.start);
+                    const end = parseScenarioDate(issue.end);
+                    if (!start || !end) return;
+                    if (!minStart || start < minStart) minStart = start;
+                    if (!maxEnd || end > maxEnd) maxEnd = end;
+                });
+                if (minStart && maxEnd) {
+                    const span = Math.max(1, maxEnd - minStart);
+                    const padding = Math.max(DAY_MS * 2, span * 0.06);
+                    setScenarioRangeOverride({
+                        start: new Date(minStart.getTime() - padding),
+                        end: new Date(maxEnd.getTime() + padding)
+                    });
+                } else {
+                    setScenarioRangeOverride(null);
+                }
+            };
+
+            const scheduleScenarioEdgeUpdate = React.useCallback(() => {
+                if (!showScenario) return;
+                if (scenarioEdgeUpdatePendingRef.current) return;
+                scenarioEdgeUpdatePendingRef.current = true;
+                window.requestAnimationFrame(() => {
+                    scenarioEdgeUpdatePendingRef.current = false;
+                    setScenarioEdgeRender(computeScenarioEdgePaths());
+                });
+            }, [computeScenarioEdgePaths, showScenario]);
+
+            const scrollToScenarioIssue = (issueKey) => {
+                if (scenarioEpicFocus) {
+                    scenarioPendingScrollRef.current = issueKey;
+                    clearScenarioEpicFocus();
+                    return;
+                }
+                const issue = scenarioIssueByKey.get(issueKey);
+                if (!issue || !scenarioTimelineRef.current) return;
+                const lane = scenarioLaneForIssue(issue);
+                if (scenarioLaneMode === 'epic') {
+                    setScenarioCollapsedLanes(prev => ({ ...prev, [lane]: false }));
+                }
+                const position = scenarioPositions[issueKey];
+                if (!position) return;
+                const container = scenarioTimelineRef.current;
+                const axis = container.querySelector('.scenario-axis');
+                const axisOffset = axis ? axis.offsetHeight : 0;
+                const targetTop = Math.max(0, position.y + axisOffset - container.clientHeight / 2);
+                container.scrollTo({ top: targetTop, behavior: 'smooth' });
+                setScenarioFlashKey(issueKey);
+                window.setTimeout(() => {
+                    setScenarioFlashKey(current => (current === issueKey ? null : current));
+                }, 1400);
+            };
+
+            useEffect(() => {
+                if (scenarioEpicFocus) return;
+                const pendingKey = scenarioPendingScrollRef.current;
+                if (!pendingKey) return;
+                if (!scenarioPositions[pendingKey]) return;
+                scenarioPendingScrollRef.current = null;
+                scrollToScenarioIssue(pendingKey);
+            }, [scenarioEpicFocus, scenarioPositions]);
+
+            useEffect(() => {
+                if (!scenarioEpicFocus || !scenarioTimelineRef.current) return;
+                const laneMeta = scenarioLaneMeta.meta.get(scenarioEpicFocus.key);
+                if (!laneMeta) return;
+                const container = scenarioTimelineRef.current;
+                const axis = container.querySelector('.scenario-axis');
+                const axisOffset = axis ? axis.offsetHeight : 0;
+                const targetTop = Math.max(0, laneMeta.offset - axisOffset);
+                container.scrollTo({ top: targetTop, behavior: 'auto' });
+            }, [scenarioEpicFocus, scenarioLaneMeta]);
+
+            useEffect(() => {
+                if (!scenarioEpicFocus) return;
+                const handleKey = (event) => {
+                    if (event.key === 'Escape') {
+                        clearScenarioEpicFocus();
+                    }
+                };
+                window.addEventListener('keydown', handleKey);
+                return () => {
+                    window.removeEventListener('keydown', handleKey);
+                };
+            }, [scenarioEpicFocus]);
 
             useEffect(() => {
                 if (isCompletedSprintSelected && showPlanning) {
@@ -5207,7 +6509,7 @@
                                         disabled={isCompletedSprintSelected}
                                         title="Toggle sprint planning panel"
                                     >
-                                        Sprint Planning
+                                        Planning
                                         <svg viewBox="0 0 12 12" fill="currentColor">
                                             <path d="M6 9L1 4h10z"/>
                                         </svg>
@@ -6118,334 +7420,375 @@
                         )}
                     </div>
 
-                    <div className={`scenario-panel ${showScenario ? 'open' : ''}`}>
-                        <div className="scenario-header">
-                            <div>
-                                <div className="scenario-title">Scenario Planner</div>
-                                <div className="scenario-subtitle">Assumption: 1 SP = {scenarioSpToWeeks} working weeks.</div>
-                            </div>
-                            <button
-                                className="secondary"
-                                onClick={runScenario}
-                                disabled={scenarioLoading || !selectedSprint}
-                            >
-                                {scenarioLoading ? 'Running...' : 'Run Scenario'}
-                            </button>
-                        </div>
-
-                        <div className="scenario-controls">
-                            <div className="scenario-control">
-                                <label>Start Date</label>
-                                <input
-                                    className="scenario-input"
-                                    type="date"
-                                    value={scenarioStartDate}
-                                    onChange={(e) => setScenarioStartDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="scenario-control">
-                                <label>Quarter End</label>
-                                <input
-                                    className="scenario-input"
-                                    type="date"
-                                    value={scenarioEndDate}
-                                    onChange={(e) => setScenarioEndDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="scenario-control">
-                                <label>SP -> Weeks</label>
-                                <input
-                                    className="scenario-input"
-                                    type="number"
-                                    min="0.1"
-                                    step="0.1"
-                                    value={scenarioSpToWeeks}
-                                    onChange={(e) => setScenarioSpToWeeks(e.target.value)}
-                                />
-                            </div>
-                            <div className="scenario-control">
-                                <label>WIP Limit</label>
-                                <input
-                                    className="scenario-input"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    value={scenarioWipLimit}
-                                    onChange={(e) => setScenarioWipLimit(e.target.value)}
-                                />
-                            </div>
-                            <div className="scenario-control">
-                                <label>Sickleave Buffer %</label>
-                                <input
-                                    className="scenario-input"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    value={scenarioSickleave}
-                                    onChange={(e) => setScenarioSickleave(e.target.value)}
-                                />
-                            </div>
-                            <div className="scenario-control">
-                                <label>Lane Mode</label>
-                                <div className="scenario-toggle-group">
-                                    <button
-                                        className={`scenario-toggle ${scenarioLaneMode === 'team' ? 'active' : ''}`}
-                                        onClick={() => setScenarioLaneMode('team')}
-                                    >
-                                        Team
-                                    </button>
-                                    <button
-                                        className={`scenario-toggle ${scenarioLaneMode === 'assignee' ? 'active' : ''}`}
-                                        onClick={() => setScenarioLaneMode('assignee')}
-                                    >
-                                        Assignee
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="scenario-team-config">
-                            <div className="scenario-team-header">
-                                <div>
-                                    <div className="scenario-team-title">Team Overrides</div>
-                                    <div className="scenario-subtitle">Defaults apply unless overridden below.</div>
-                                </div>
-                                <div className="scenario-team-defaults">
-                                    <div>
-                                        <div className="scenario-team-default-label">Default size</div>
-                                        <input
-                                            className="scenario-input small"
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={scenarioDefaultTeamSize}
-                                            onChange={(e) => setScenarioDefaultTeamSize(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="scenario-team-default-label">Vacation weeks</div>
-                                        <input
-                                            className="scenario-input small"
-                                            type="number"
-                                            min="0"
-                                            step="0.5"
-                                            value={scenarioDefaultVacation}
-                                            onChange={(e) => setScenarioDefaultVacation(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="scenario-team-grid">
-                                <div className="scenario-team-grid-header">Team</div>
-                                <div className="scenario-team-grid-header">Size</div>
-                                <div className="scenario-team-grid-header">Vacation</div>
-                                {scenarioTeamNames.length === 0 && (
-                                    <>
-                                        <div className="scenario-team-name">No teams selected</div>
-                                        <div>-</div>
-                                        <div>-</div>
-                                    </>
-                                )}
-                                {scenarioTeamNames.map((team) => (
-                                    <React.Fragment key={team}>
-                                        <div className="scenario-team-name">{team}</div>
-                                        <input
-                                            className="scenario-input"
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={scenarioTeamOverrides[team]?.size ?? ''}
-                                            placeholder={scenarioDefaultTeamSize}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setScenarioTeamOverrides(prev => ({
-                                                    ...prev,
-                                                    [team]: { ...(prev[team] || {}), size: value }
-                                                }));
-                                            }}
-                                        />
-                                        <input
-                                            className="scenario-input"
-                                            type="number"
-                                            min="0"
-                                            step="0.5"
-                                            value={scenarioTeamOverrides[team]?.vacation ?? ''}
-                                            placeholder={scenarioDefaultVacation}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setScenarioTeamOverrides(prev => ({
-                                                    ...prev,
-                                                    [team]: { ...(prev[team] || {}), vacation: value }
-                                                }));
-                                            }}
-                                        />
-                                    </React.Fragment>
-                                ))}
-                            </div>
-                        </div>
-
-                        {scenarioError && <div className="scenario-error">{scenarioError}</div>}
-                        {scenarioLoading && <div className="scenario-loading">Computing scenario timeline...</div>}
-
-                        {scenarioData && (
-                            <>
-                                <div className="scenario-summary">
-                                    <div className="scenario-card">
-                                        <h4>Deadline</h4>
-                                        <div className="scenario-value">
-                                            {scenarioSummary.deadline_met ? 'On track' : 'At risk'}
+                    {showScenario && (
+                        <div className="scenario-fullbleed">
+                            <div className="scenario-panel open">
+                                <div className="scenario-inner">
+                                    <div className="scenario-header">
+                                        <div>
+                                            <div className="scenario-title">Scenario Planner</div>
+                                            <div className="scenario-subtitle">Capacity comes from Jira capacity issues (watchers per team).</div>
                                         </div>
-                                        <div className="scenario-subtitle">
-                                            {scenarioSummary.late_items?.length || 0} finishing after quarter end
-                                        </div>
-                                        <div className="scenario-issues-list">
-                                            {(scenarioSummary.late_items || []).slice(0, 4).map(key => (
-                                                <a
-                                                    key={key}
-                                                    className="scenario-link"
-                                                    href={jiraUrl ? `${jiraUrl}/browse/${key}` : '#'}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    {key}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="scenario-card">
-                                        <h4>Critical Path</h4>
-                                        <div className="scenario-value">
-                                            {scenarioSummary.critical_path?.length || 0} items
-                                        </div>
-                                        <div className="scenario-issues-list">
-                                            {(scenarioSummary.critical_path || []).slice(0, 6).map(key => (
-                                                <a
-                                                    key={key}
-                                                    className="scenario-link"
-                                                    href={jiraUrl ? `${jiraUrl}/browse/${key}` : '#'}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    {key}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="scenario-card">
-                                        <h4>Bottlenecks</h4>
-                                        <div className="scenario-value">
-                                            {(scenarioSummary.bottleneck_lanes || []).slice(0, 2).join(', ') || 'None'}
-                                        </div>
-                                        <div className="scenario-subtitle">
-                                            {(scenarioSummary.bottleneck_lanes || []).length} lanes flagged
-                                        </div>
-                                    </div>
-                                    <div className="scenario-card">
-                                        <h4>Unschedulable</h4>
-                                        <div className="scenario-value">{scenarioSummary.unschedulable?.length || 0}</div>
-                                        <div className="scenario-subtitle">Missing SP or dependencies</div>
-                                    </div>
-                                </div>
-
-                                <div className="scenario-timeline" ref={scenarioTimelineRef}>
-                                    <div className="scenario-axis">
-                                        {scenarioTicks.map((tick) => (
-                                            <span key={tick.label}>{tick.label}</span>
-                                        ))}
-                                    </div>
-                                    <div className="scenario-lanes">
-                                        {scenarioLanes.map((lane) => (
-                                            <div key={lane} className="scenario-lane">
-                                                <div className="scenario-lane-label">{lane}</div>
-                                                <div className="scenario-lane-track">
-                                                    {(scenarioIssuesByLane.get(lane) || []).map(issue => {
-                                                        if (!issue.start_date || !issue.end_date || !scenarioStart || !scenarioEnd) {
-                                                            return null;
-                                                        }
-                                                        const start = parseScenarioDate(issue.start_date);
-                                                        const end = parseScenarioDate(issue.end_date);
-                                                        if (!start || !end) return null;
-                                                        const totalMs = Math.max(1, scenarioEnd - scenarioStart);
-                                                        const startRatio = Math.max(0, (start - scenarioStart) / totalMs);
-                                                        const endRatio = Math.min(1, (end - scenarioStart) / totalMs);
-                                                        const left = `${startRatio * 100}%`;
-                                                        const width = `${Math.max(2, (endRatio - startRatio) * 100)}%`;
-                                                        return (
-                                                            <div
-                                                                key={issue.key}
-                                                                className={`scenario-bar ${issue.is_critical ? 'critical' : ''} ${issue.is_late ? 'late' : ''} ${(issue.blocked_by || []).length > 0 ? 'blocked' : ''}`}
-                                                                style={{ left, width, height: `${SCENARIO_BAR_HEIGHT}px` }}
-                                                                title={`${issue.key} · ${issue.summary}${issue.slack_weeks !== null && issue.slack_weeks !== undefined ? ` · Slack ${issue.slack_weeks.toFixed(1)}w` : ''}`}
-                                                            >
-                                                                {issue.key}
-                                                            </div>
-                                                        );
-                                                    })}
+                                        <div className="scenario-controls">
+                                            <div className="scenario-control">
+                                                <label>Lane Mode</label>
+                                                <div className="scenario-toggle-group">
+                                                    <button
+                                                        className={`scenario-toggle ${scenarioLaneMode === 'team' ? 'active' : ''}`}
+                                                        onClick={() => setScenarioLaneMode('team')}
+                                                        disabled={scenarioEpicFocus}
+                                                    >
+                                                        Team
+                                                    </button>
+                                                    <button
+                                                        className={`scenario-toggle ${scenarioLaneMode === 'epic' ? 'active' : ''}`}
+                                                        onClick={() => setScenarioLaneMode('epic')}
+                                                        disabled={scenarioEpicFocus}
+                                                    >
+                                                        Epic
+                                                    </button>
+                                                    <button
+                                                        className={`scenario-toggle ${scenarioLaneMode === 'assignee' ? 'active' : ''}`}
+                                                        onClick={() => setScenarioLaneMode('assignee')}
+                                                        disabled={!scenarioHasAssignees || scenarioEpicFocus}
+                                                    >
+                                                        Assignee
+                                                    </button>
                                                 </div>
                                             </div>
-                                        ))}
+                                            <button
+                                                className="secondary"
+                                                onClick={runScenario}
+                                                disabled={scenarioLoading || !selectedSprint}
+                                            >
+                                                {scenarioLoading ? 'Running...' : 'Run Scenario'}
+                                            </button>
+                                        </div>
                                     </div>
-                                    {scenarioLayout.width > 0 && (
-                                        <svg
-                                            className="scenario-deps"
-                                            viewBox={`0 0 ${scenarioLayout.width} ${scenarioLayout.height}`}
-                                            preserveAspectRatio="none"
-                                            style={{ height: `${scenarioLayout.height}px` }}
-                                        >
-                                            <defs>
-                                                <marker id="scenario-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                                                    <path d="M0,0 L6,3 L0,6 z" fill="#94a3b8" />
-                                                </marker>
-                                            </defs>
-                                            {scenarioEdges.map((edge, index) => {
-                                                const from = scenarioPositions[edge.from];
-                                                const to = scenarioPositions[edge.to];
-                                                if (!from || !to) return null;
-                                                const midX = from.xEnd + 6;
-                                                return (
-                                                    <path
-                                                        key={`${edge.from}-${edge.to}-${index}`}
-                                                        d={`M ${from.xEnd} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${to.xStart} ${to.y}`}
-                                                        fill="none"
-                                                        stroke="#94a3b8"
-                                                        strokeWidth="1"
-                                                        markerEnd="url(#scenario-arrow)"
+
+                                    {scenarioError && <div className="scenario-error">{scenarioError}</div>}
+                                    {scenarioLoading && <div className="scenario-loading">Computing scenario timeline...</div>}
+
+                                    {scenarioData && (
+                                        <>
+                                            <div className="scenario-summary">
+                                                <div className="scenario-card">
+                                                    <h4>Deadline</h4>
+                                                    <div className="scenario-value">
+                                                        {scenarioDeadlineAtRisk ? 'At risk' : 'On track'}
+                                                    </div>
+                                                    <div className="scenario-subtitle">
+                                                        {scenarioLateItems.length} finishing after quarter end
+                                                    </div>
+                                                    <div className="scenario-issues-list">
+                                                        {scenarioLateItems.slice(0, 4).map(key => {
+                                                            const issue = scenarioIssueByKey.get(key);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={key}
+                                                                    className="scenario-link"
+                                                                    onClick={() => scrollToScenarioIssue(key)}
+                                                                >
+                                                                    <span>{issue?.summary || key}</span>
+                                                                    <span className="scenario-link-key">{key}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div className="scenario-card">
+                                                    <h4>Critical Path</h4>
+                                                    <div className="scenario-value">
+                                                        {scenarioCriticalPathItems.length} items
+                                                    </div>
+                                                    <div className="scenario-issues-list">
+                                                        {scenarioCriticalPathItems.slice(0, 6).map(key => {
+                                                            const issue = scenarioIssueByKey.get(key);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={key}
+                                                                    className="scenario-link"
+                                                                    onClick={() => scrollToScenarioIssue(key)}
+                                                                >
+                                                                    <span>{issue?.summary || key}</span>
+                                                                    <span className="scenario-link-key">{key}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div className="scenario-card">
+                                                    <h4>Bottlenecks</h4>
+                                                    <div className="scenario-value">
+                                                        {scenarioBottleneckLanes.slice(0, 2).join(', ') || 'None'}
+                                                    </div>
+                                                    <div className="scenario-subtitle">
+                                                        {scenarioBottleneckLanes.length} lanes flagged
+                                                    </div>
+                                                </div>
+                                                <div className="scenario-card">
+                                                    <h4>Unschedulable</h4>
+                                                    <div className="scenario-value">{scenarioUnschedulableItems.length}</div>
+                                                    <div className="scenario-subtitle">Missing SP or dependencies</div>
+                                                    <div className="scenario-issues-list">
+                                                        {scenarioUnschedulableItems.slice(0, 4).map(key => {
+                                                            const issue = scenarioIssueByKey.get(key);
+                                                            const reason = issue?.scheduledReason;
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={key}
+                                                                    className="scenario-link"
+                                                                    onClick={() => scrollToScenarioIssue(key)}
+                                                                >
+                                                                    <span>{issue?.summary || key}</span>
+                                                                    <span className="scenario-link-key">
+                                                                        {key}{reason ? ` · ${reason}` : ''}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {scenarioEpicFocus && (
+                                                <div className="scenario-focus-indicator">
+                                                    <button
+                                                        type="button"
+                                                        className="scenario-focus-exit"
+                                                        onClick={clearScenarioEpicFocus}
+                                                    >
+                                                        <span>Focused: {scenarioEpicFocus.summary || scenarioEpicFocus.key} (click to exit)</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="scenario-timeline" ref={scenarioTimelineRef}>
+                                                <div className="scenario-axis">
+                                                    {scenarioTicks.map((tick) => (
+                                                        <span key={tick.label}>{tick.label}</span>
+                                                    ))}
+                                                </div>
+                                                <div
+                                                    className="scenario-lanes"
+                                                    style={{ height: `${scenarioLaneMeta.totalHeight}px` }}
+                                                >
+                                                    {scenarioLayout.width > 0 && scenarioQuarterMarkers.map((marker, index) => {
+                                                        const left = scenarioLayout.labelWidth + scenarioLayout.width * marker.ratio;
+                                                        return (
+                                                            <div
+                                                                key={`quarter-${index}-${marker.date.toISOString()}`}
+                                                                className="scenario-quarter-line"
+                                                                style={{ left: `${left}px` }}
+                                                            />
+                                                        );
+                                                    })}
+                                                    {scenarioVisibleLanes.map((lane) => {
+                                                        const laneMeta = scenarioLaneMeta.meta.get(lane) || { height: SCENARIO_LANE_HEIGHT };
+                                                        const laneHeight = laneMeta.height;
+                                                        const laneIssues = scenarioIssuesByLane.get(lane) || [];
+                                                        const laneEpicBars = scenarioEpicBars.filter(bar => bar.lane === lane);
+                                                        const laneInfo = scenarioLaneInfo.get(lane) || { label: lane, key: lane };
+                                                        const isCollapsed = laneMeta.collapsed;
+                                                        return (
+                                                        <div
+                                                            key={lane}
+                                                            className="scenario-lane"
+                                                            style={{ top: `${laneMeta.offset}px` }}
+                                                        >
+                                                            <button
+                                                                className="scenario-lane-label"
+                                                                type="button"
+                                                                disabled={scenarioEpicFocus}
+                                                                onClick={() => !scenarioEpicFocus && toggleScenarioLane(lane)}
+                                                                aria-expanded={!isCollapsed}
+                                                            >
+                                                                <div className="scenario-lane-title">
+                                                                    <span className="scenario-lane-title-text">
+                                                                        {normalizeScenarioSummary(laneInfo.label) || laneInfo.label}
+                                                                    </span>
+                                                                    {scenarioLaneMode !== 'epic' && laneInfo.key && laneInfo.key !== laneInfo.label && (
+                                                                        <span className="scenario-lane-key">{laneInfo.key}</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="scenario-lane-meta">
+                                                                    {Number.isFinite(laneInfo.totalSp) && laneInfo.totalSp > 0 && (
+                                                                        <div className="scenario-lane-sp">Allocated: {laneInfo.totalSp.toFixed(1)} SP.</div>
+                                                                    )}
+                                                                    {scenarioLaneMode === 'team' && laneInfo.capacity != null && (
+                                                                        <div className="scenario-lane-capacity">Team Size: {laneInfo.capacity} 👥</div>
+                                                                    )}
+                                                                    {scenarioLaneMode === 'team' && (
+                                                                        <div className={`scenario-lane-status ${(laneInfo.lateCount || laneInfo.unschedulableCount) ? 'risk' : 'ok'}`}>
+                                                                            Status: {(laneInfo.lateCount || laneInfo.unschedulableCount) ? 'At risk' : 'OK'}
+                                                                        </div>
+                                                                    )}
+                                                                    {laneMeta.hiddenCount > 0 && (
+                                                                        <div className="scenario-lane-more">+{laneMeta.hiddenCount} more</div>
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                            <div className="scenario-lane-track" style={{ height: `${laneHeight}px` }}>
+                                                                {laneEpicBars.map(bar => {
+                                                                    const left = `${(bar.xStart / scenarioLayout.width) * 100}%`;
+                                                                    const width = `${Math.max(2, ((bar.xEnd - bar.xStart) / scenarioLayout.width) * 100)}%`;
+                                                                    const top = `${Math.max(2, bar.y - (scenarioLaneMeta.meta.get(lane)?.offset || 0))}px`;
+                                                                    const height = `${Math.max(10, bar.height)}px`;
+                                                                    const epicTooltip = buildScenarioTooltipPayload(
+                                                                        bar.epicSummary || bar.epicKey,
+                                                                        bar.epicKey,
+                                                                        bar.storyPoints,
+                                                                        bar.isExcluded
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={`${bar.lane}-${bar.epicKey}`}
+                                                                            className={`scenario-epic-bar ${bar.isExcluded ? 'excluded' : ''}`}
+                                                                            style={{ left, width, top, height }}
+                                                                            role="button"
+                                                                            tabIndex={0}
+                                                                            onClick={() => focusScenarioEpic(bar.epicKey, bar.epicSummary)}
+                                                                            onKeyDown={(event) => {
+                                                                                if (event.key === 'Enter' || event.key === ' ') {
+                                                                                    event.preventDefault();
+                                                                                    focusScenarioEpic(bar.epicKey, bar.epicSummary);
+                                                                                }
+                                                                            }}
+                                                                            onMouseEnter={(event) => showScenarioTooltip(event, epicTooltip)}
+                                                                            onMouseMove={moveScenarioTooltip}
+                                                                            onMouseLeave={hideScenarioTooltip}
+                                                                            onFocus={(event) => showScenarioTooltipFromElement(event.currentTarget, epicTooltip)}
+                                                                            onBlur={hideScenarioTooltip}
+                                                                        >
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                                {laneIssues.map((issue) => {
+                                                                    const position = scenarioPositions[issue.key];
+                                                                    if (!position || !scenarioLayout.width) return null;
+                                                                    const left = `${(position.xStart / scenarioLayout.width) * 100}%`;
+                                                                    const width = `${Math.max(2, ((position.xEnd - position.xStart) / scenarioLayout.width) * 100)}%`;
+                                                                    const top = `${position.y - (scenarioLaneMeta.meta.get(lane)?.offset || 0)}px`;
+                                                                    const issueUrl = scenarioBaseUrl ? `${scenarioBaseUrl}/browse/${issue.key}` : '';
+                                                                    const issueSummary = normalizeScenarioSummary(issue.summary) || issue.key;
+                                                                    const isExcluded = excludedEpicSet.has(issue.epicKey || '');
+                                                                    const issueTooltip = buildScenarioTooltipPayload(issue.summary || issue.key, issue.key, issue.sp, isExcluded);
+                                                                    const isFocused = scenarioHoverKey === issue.key || scenarioFlashKey === issue.key;
+                                                                    const isUpstream = scenarioUpstreamSet.has(issue.key);
+                                                                    const isDownstream = scenarioDownstreamSet.has(issue.key);
+                                                                    const isDimmed = scenarioHoverKey && !isFocused && !isUpstream && !isDownstream;
+                                                                    const isUnscheduled = !issue.start || !issue.end;
+                                                                    const isFocusContext = scenarioEpicFocus && scenarioFocusContextKeys.has(issue.key) && !scenarioFocusIssueKeys.has(issue.key);
+                                                                    const isSearchMatch = scenarioSearchQuery && scenarioSearchMatchSet.has(issue.key);
+                                                                    return (
+                                                                        <a
+                                                                            key={issue.key}
+                                                                            className={`scenario-bar ${issue.isCritical ? 'critical' : ''} ${issue.isLate ? 'late' : ''} ${((issue.blockedBy || []).length > 0 || scenarioBlockedSet.has(issue.key)) ? 'blocked' : ''} ${(issue.isContext || isFocusContext) ? 'context' : ''} ${isUnscheduled ? 'unscheduled' : ''} ${isFocused ? 'is-focused' : ''} ${isUpstream ? 'is-upstream' : ''} ${isDownstream ? 'is-downstream' : ''} ${isDimmed ? 'dimmed' : ''} ${scenarioFlashKey === issue.key ? 'flash' : ''} ${isExcluded ? 'excluded' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                                                            style={{ left, width, height: `${SCENARIO_BAR_HEIGHT}px`, top }}
+                                                                            href={issueUrl || '#'}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            ref={registerScenarioIssueRef(issue.key)}
+                                                                            onClick={(event) => {
+                                                                                if (!issueUrl) {
+                                                                                    event.preventDefault();
+                                                                                }
+                                                                            }}
+                                                                            onMouseEnter={(event) => {
+                                                                                setScenarioHoverKey(issue.key);
+                                                                                showScenarioTooltip(event, issueTooltip);
+                                                                            }}
+                                                                            onMouseMove={moveScenarioTooltip}
+                                                                            onMouseLeave={() => {
+                                                                                setScenarioHoverKey(null);
+                                                                                hideScenarioTooltip();
+                                                                            }}
+                                                                            onFocus={(event) => {
+                                                                                setScenarioHoverKey(issue.key);
+                                                                                showScenarioTooltipFromElement(event.currentTarget, issueTooltip);
+                                                                            }}
+                                                                            onBlur={() => {
+                                                                                setScenarioHoverKey(null);
+                                                                                hideScenarioTooltip();
+                                                                            }}
+                                                                        >
+                                                                            <div className="scenario-bar-inner">
+                                                                                <div className="scenario-bar-summary">{issueSummary}</div>
+                                                                            </div>
+                                                                        </a>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )})}
+                                                </div>
+                                                {scenarioEdgeRender.width > 0 && (
+                                                    <svg
+                                                        className="scenario-deps"
+                                                        viewBox={`0 0 ${scenarioEdgeRender.width} ${scenarioEdgeRender.height}`}
+                                                        preserveAspectRatio="none"
+                                                        style={{ height: `${scenarioEdgeRender.height}px`, width: `${scenarioEdgeRender.width}px` }}
+                                                    >
+                                                        <defs>
+                                                            <marker id="scenario-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                                                <path d="M0,0 L6,3 L0,6 z" fill="#94a3b8" />
+                                                            </marker>
+                                                            <marker id="scenario-arrow-block" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                                                <path d="M0,0 L6,3 L0,6 z" fill="#ef4444" />
+                                                            </marker>
+                                                        </defs>
+                                                        {scenarioLaneMode === 'epic' && scenarioEpicEdges.map((edge, index) => (
+                                                            <g key={`epic-edge-${edge.fromEpic}-${edge.toEpic}-${index}`}>
+                                                                <path
+                                                                    className="scenario-epic-edge"
+                                                                    d={`M 8 ${edge.y1} L 8 ${edge.y2}`}
+                                                                />
+                                                                <text className="scenario-epic-edge-label" x="12" y={(edge.y1 + edge.y2) / 2}>
+                                                                    {edge.count}
+                                                                </text>
+                                                            </g>
+                                                        ))}
+                                                        {scenarioEdgeRender.paths.map((path) => {
+                                                            return (
+                                                                <path
+                                                                    key={path.id}
+                                                                    className={`scenario-edge ${path.isActive ? 'active' : ''} ${path.isFaded ? 'faded' : ''} ${path.isContextEdge ? 'context' : ''} ${path.type === 'block' ? 'block' : ''}`}
+                                                                    d={path.d}
+                                                                    markerEnd={path.type === 'block' ? 'url(#scenario-arrow-block)' : 'url(#scenario-arrow)'}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </svg>
+                                                )}
+                                                {scenarioLayout.width > 0 && (
+                                                    <div
+                                                        className="scenario-deadline"
+                                                        style={{ left: `${scenarioDeadlineLeft}px` }}
                                                     />
-                                                );
-                                            })}
-                                        </svg>
-                                    )}
-                                    {scenarioLayout.width > 0 && (
-                                        <div
-                                            className="scenario-deadline"
-                                            style={{ left: `${scenarioDeadlineLeft}px` }}
-                                        />
+                                                )}
+                                                <div
+                                                    className={`scenario-tooltip ${scenarioTooltip.visible ? 'visible' : ''}`}
+                                                    style={{ left: `${scenarioTooltip.x}px`, top: `${scenarioTooltip.y}px` }}
+                                                    ref={scenarioTooltipRef}
+                                                >
+                                                    <div>{scenarioTooltip.summary}</div>
+                                                    {scenarioTooltip.key && <div className="scenario-tooltip-key">{scenarioTooltip.key}</div>}
+                                                    {Number.isFinite(scenarioTooltip.sp) && (
+                                                        <div className="scenario-tooltip-key">SP: {scenarioTooltip.sp.toFixed(1)}</div>
+                                                    )}
+                                                    {scenarioTooltip.note && (
+                                                        <div className="scenario-tooltip-note">{scenarioTooltip.note}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
-
-                                {scenarioUnschedulable.length > 0 && (
-                                    <div className="scenario-issues-list">
-                                        <strong>Unscheduled:</strong>
-                                        {scenarioUnschedulable.slice(0, 8).map(issue => (
-                                            <span key={issue.key}>
-                                                <a
-                                                    className="scenario-link"
-                                                    href={jiraUrl ? `${jiraUrl}/browse/${issue.key}` : '#'}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    {issue.key}
-                                                </a>
-                                                {' · '}
-                                                {issue.scheduled_reason}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
+                            </div>
+                        </div>
+                    )}
 
 	                    <div ref={planningPanelRef} className={`planning-panel ${showPlanning && !isCompletedSprintSelected ? 'open' : ''}`}>
 	                        <div className="planning-stats">

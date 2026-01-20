@@ -14,6 +14,7 @@ class Issue:
     priority: Optional[str]
     status: Optional[str]
     epic_key: Optional[str] = None
+    team_id: Optional[str] = None
 
 
 @dataclass
