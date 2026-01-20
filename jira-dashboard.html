@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Jira · Sprint Tasks v2.0</title>
+    <title>Jira Execution Planner</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -94,6 +94,12 @@
             align-items: center;
             gap: 1rem;
             flex-wrap: wrap;
+        }
+
+        .subtitle-secondary {
+            font-size: 0.4375rem;
+            letter-spacing: 0.12em;
+            opacity: 0.85;
         }
 
         .search-input {
@@ -1624,6 +1630,20 @@
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .scenario-beta {
+            font-size: 0.6rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #b45309;
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(251, 191, 36, 0.35);
+            border-radius: 999px;
+            padding: 0.05rem 0.35rem;
         }
 
         .scenario-subtitle {
@@ -6352,9 +6372,11 @@
             return (
                 <div className="container" style={{ '--planning-offset': `${planningOffset}px` }}>
                     <header>
-                        <h1>Sprint Tasks</h1>
                         <div className="subtitle">
-                            <span>Product & Tech Projects · {sprintName}</span>
+                            <span>
+                                Jira Execution Planner
+                                <span className="subtitle-secondary"> · Product &amp; Tech Projects</span>
+                            </span>
                             <div className="header-actions">
                                 <button
                                     className="secondary compact"
@@ -7426,7 +7448,10 @@
                                 <div className="scenario-inner">
                                     <div className="scenario-header">
                                         <div>
-                                            <div className="scenario-title">Scenario Planner</div>
+                                            <div className="scenario-title">
+                                                Scenario Planner
+                                                <span className="scenario-beta">Beta</span>
+                                            </div>
                                             <div className="scenario-subtitle">Capacity comes from Jira capacity issues (watchers per team).</div>
                                         </div>
                                         <div className="scenario-controls">
