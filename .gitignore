@@ -31,6 +31,8 @@ Thumbs.db
 # Cache
 sprints_cache.json
 stats_cache.json
+teams.json
+team-groups.json
 
 # Local artifacts
 avaliablefields.txt
