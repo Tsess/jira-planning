@@ -7989,6 +7989,49 @@
             };
 
             const isExcludedStatus = (status) => status === 'killed' || status === 'postponed' || status === 'done';
+            const getTaskSprintTokens = (task) => {
+                const tokens = [];
+                const pushToken = (value) => {
+                    if (value === null || value === undefined) return;
+                    const str = String(value).trim();
+                    if (!str) return;
+                    tokens.push(str);
+                };
+                const sprintField = task?.fields?.customfield_10101;
+                if (!sprintField) return tokens;
+                if (Array.isArray(sprintField)) {
+                    sprintField.forEach((entry) => {
+                        if (entry && typeof entry === 'object') {
+                            pushToken(entry.id);
+                            pushToken(entry.name);
+                        } else {
+                            pushToken(entry);
+                        }
+                    });
+                } else if (typeof sprintField === 'object') {
+                    pushToken(sprintField.id);
+                    pushToken(sprintField.name);
+                } else if (typeof sprintField === 'string') {
+                    pushToken(sprintField);
+                    const match = sprintField.match(/id=([0-9]+)/);
+                    if (match) {
+                        pushToken(match[1]);
+                    }
+                } else {
+                    pushToken(sprintField);
+                }
+                return tokens;
+            };
+            const isTaskInSelectedSprint = (task) => {
+                if (!selectedSprint) return false;
+                const tokens = getTaskSprintTokens(task);
+                if (!tokens.length) return false;
+                const selectedId = String(selectedSprint);
+                const selectedName = selectedSprintInfo?.name ? String(selectedSprintInfo.name) : '';
+                if (tokens.includes(selectedId)) return true;
+                if (selectedName && tokens.includes(selectedName)) return true;
+                return false;
+            };
             const resolveDependencyStatus = (dep) => {
                 if (!dep?.key) return '';
                 const issue = issueByKey.get(dep.key);
@@ -8010,17 +8053,6 @@
                 return blockersDone ? 'Unblocked' : baseLabel;
             };
             const dismissedAlertSet = React.useMemo(() => new Set(dismissedAlertKeys || []), [dismissedAlertKeys]);
-            const sprintMissingKeySet = React.useMemo(() => {
-                const keys = new Set();
-                (missingPlanningInfoTasks || []).forEach(task => {
-                    if (!task?.key) return;
-                    const missing = task.fields?.missingFields || [];
-                    if (missing.includes('Sprint')) {
-                        keys.add(task.key);
-                    }
-                });
-                return keys;
-            }, [missingPlanningInfoTasks]);
 
             const blockedTasks = visibleTasks.filter(task => {
                 const status = normalizeStatus(task.fields.status?.name);
@@ -8032,14 +8064,9 @@
 
             const consolidatedMissingStories = React.useMemo(() => {
                 const byKey = new Map();
-                const allowSprintMissing = isFirstFutureSprintSelected;
                 const shouldIncludeUnknownTeam = (task, missing) => {
                     const teamMissing = !task?.fields?.teamId && !task?.fields?.teamName;
                     if (!teamMissing) return true;
-                    if (!allowSprintMissing) return false;
-                    const sprintMissing = missing.has('Sprint') || sprintMissingKeySet.has(task.key);
-                    if (!sprintMissing) return false;
-                    missing.add('Sprint');
                     return true;
                 };
 
@@ -8060,13 +8087,11 @@
                     return isExcludedStatus(status);
                 };
 
-                // Start with server-provided missing info (covers missing Sprint)
+                // Start with server-provided missing info, but only keep items in the selected sprint.
                 (missingPlanningInfoTasks || []).forEach((task) => {
                     if (!task?.key || excluded(task) || !shouldIncludeByTeam(task)) return;
+                    if (!isTaskInSelectedSprint(task)) return;
                     const missing = new Set(task.fields?.missingFields || []);
-                    if (!allowSprintMissing) {
-                        missing.delete('Sprint');
-                    }
                     if (!shouldIncludeUnknownTeam(task, missing)) return;
                     if (missing.size === 0) return;
                     byKey.set(task.key, { task, missing });
@@ -8099,7 +8124,15 @@
                         if (priorityA !== priorityB) return priorityA - priorityB;
                         return (a.task.fields.summary || '').localeCompare(b.task.fields.summary || '');
                     });
-            }, [missingPlanningInfoTasks, visibleTasks, isAllTeamsSelected, selectedTeamSet, isFirstFutureSprintSelected, dismissedAlertKeys, sprintMissingKeySet]);
+            }, [
+                missingPlanningInfoTasks,
+                visibleTasks,
+                isAllTeamsSelected,
+                selectedTeamSet,
+                dismissedAlertKeys,
+                selectedSprint,
+                selectedSprintInfo?.name
+            ]);
 
             const emptyEpics = epicsInScope
                 .filter(epic => {
