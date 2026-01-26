@@ -1568,15 +1568,15 @@
 
         .dependency-count[data-dep-chip="depends-on"]:hover,
         .dependency-count[data-dep-chip="blocked-by"]:hover {
-            background: rgba(239, 68, 68, 0.12);
-            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.16);
+            border-color: rgba(239, 68, 68, 0.55);
             color: #7f1d1d;
         }
 
         .dependency-count[data-dep-chip="dependents"]:hover,
         .dependency-count[data-dep-chip="blocks"]:hover {
-            background: rgba(59, 130, 246, 0.12);
-            border-color: rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.16);
+            border-color: rgba(59, 130, 246, 0.55);
             color: #1d4ed8;
         }
 
@@ -1681,6 +1681,15 @@
             overflow: hidden;
             text-overflow: ellipsis;
             line-height: 1.4;
+        }
+
+        a.dependency-missing-item {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        a.dependency-missing-item:hover {
+            text-decoration: underline;
         }
 
         .dependency-missing-sep {
@@ -3900,6 +3909,7 @@
             const [scenarioEdgeRender, setScenarioEdgeRender] = useState({ width: 0, height: 0, paths: [] });
             const [dependencyData, setDependencyData] = useState({});
             const [dependencyFocus, setDependencyFocus] = useState(null);
+            const [dependencyHover, setDependencyHover] = useState(null);
             const [dependencyLookupCache, setDependencyLookupCache] = useState({});
             const [dependencyLookupLoading, setDependencyLookupLoading] = useState(false);
             const [excludedStatsEpics, setExcludedStatsEpics] = useState(savedPrefsRef.current.excludedStatsEpics ?? []);
@@ -7524,9 +7534,10 @@
                 return map;
             }, [dependencyTasks]);
 
+            const activeDependencyFocus = dependencyFocus || dependencyHover;
             const focusRelatedSet = React.useMemo(() => {
-                return new Set(dependencyFocus?.relatedKeys || []);
-            }, [dependencyFocus]);
+                return new Set(activeDependencyFocus?.relatedKeys || []);
+            }, [activeDependencyFocus]);
 
             const summaryStats = React.useMemo(() => {
                 const counts = {
@@ -7732,6 +7743,34 @@
                     setDependencyFocus(null);
                 }
             };
+
+            const handleDependencyHoverEnter = (taskKey, action) => {
+                if (!taskKey || !action) return;
+                if (dependencyFocus) return;
+                const dependencyKeys = getFocusKeys(taskKey, action);
+                const relatedKeys = Array.from(new Set([taskKey, ...dependencyKeys]));
+                setDependencyHover({
+                    taskKey,
+                    action,
+                    relatedKeys,
+                    dependencyKeys
+                });
+            };
+
+            const handleDependencyHoverLeave = (taskKey, action) => {
+                if (dependencyFocus) return;
+                setDependencyHover((prev) => {
+                    if (!prev) return prev;
+                    if (prev.taskKey !== taskKey || prev.action !== action) return prev;
+                    return null;
+                });
+            };
+
+            useEffect(() => {
+                if (dependencyFocus) {
+                    setDependencyHover(null);
+                }
+            }, [dependencyFocus]);
 
             useEffect(() => {
                 if (!dependencyFocus) return;
@@ -10972,7 +11011,7 @@
                                 </div>
                             ) : (
                                 <div
-                                    className={`task-list ${dependencyFocus ? 'focus-mode' : ''}`}
+                                    className={`task-list ${activeDependencyFocus ? 'focus-mode' : ''}`}
                                     onClick={handleDependencyFocusClick}
                                 >
                                     {epicGroups.map(epicGroup => {
@@ -11095,15 +11134,27 @@
                                                     const isBlocksFocusActive = dependencyFocus &&
                                                         dependencyFocus.taskKey === task.key &&
                                                         dependencyFocus.action === 'blocks';
-                                                    const isFocusActive = !!dependencyFocus;
+                                                    const isDependsHoverActive = dependencyHover &&
+                                                        dependencyHover.taskKey === task.key &&
+                                                        dependencyHover.action === 'depends-on';
+                                                    const isDependentsHoverActive = dependencyHover &&
+                                                        dependencyHover.taskKey === task.key &&
+                                                        dependencyHover.action === 'dependents';
+                                                    const isBlockedByHoverActive = dependencyHover &&
+                                                        dependencyHover.taskKey === task.key &&
+                                                        dependencyHover.action === 'blocked-by';
+                                                    const isBlocksHoverActive = dependencyHover &&
+                                                        dependencyHover.taskKey === task.key &&
+                                                        dependencyHover.action === 'blocks';
+                                                    const isFocusActive = !!activeDependencyFocus;
                                                     const isRelated = !isFocusActive || focusRelatedSet.has(task.key);
-                                                    const isFocused = isFocusActive && dependencyFocus.taskKey === task.key;
+                                                    const isFocused = isFocusActive && activeDependencyFocus.taskKey === task.key;
                                                     const isUpstream = isFocusActive &&
-                                                        (dependencyFocus.action === 'depends-on' || dependencyFocus.action === 'blocked-by') &&
+                                                        (activeDependencyFocus.action === 'depends-on' || activeDependencyFocus.action === 'blocked-by') &&
                                                         !isFocused &&
                                                         focusRelatedSet.has(task.key);
                                                     const isDownstream = isFocusActive &&
-                                                        (dependencyFocus.action === 'dependents' || dependencyFocus.action === 'blocks') &&
+                                                        (activeDependencyFocus.action === 'dependents' || activeDependencyFocus.action === 'blocks') &&
                                                         !isFocused &&
                                                         focusRelatedSet.has(task.key);
                                                     const missingKeys = isFocused ? (dependencyFocus?.missingKeys || []) : [];
@@ -11235,11 +11286,13 @@
                                                                     {blockedByIds.length > 0 && (
                                                                         <button
                                                                             type="button"
-                                                                            className={`dependency-count ${isBlockedByFocusActive ? 'active' : ''}`}
+                                                                            className={`dependency-count ${(isBlockedByFocusActive || isBlockedByHoverActive) ? 'active' : ''}`}
                                                                             data-dep-chip="blocked-by"
                                                                             data-task-id={task.id || task.key}
                                                                             data-task-key={task.key}
                                                                             aria-label={`Blocked by ${blockedByIds.length} tasks`}
+                                                                            onMouseEnter={() => handleDependencyHoverEnter(task.key, 'blocked-by')}
+                                                                            onMouseLeave={() => handleDependencyHoverLeave(task.key, 'blocked-by')}
                                                                         >
                                                                             BLOCKED BY {blockedByIds.length}
                                                                         </button>
@@ -11247,11 +11300,13 @@
                                                                     {blocksIds.length > 0 && (
                                                                         <button
                                                                             type="button"
-                                                                            className={`dependency-count ${isBlocksFocusActive ? 'active' : ''}`}
+                                                                            className={`dependency-count ${(isBlocksFocusActive || isBlocksHoverActive) ? 'active' : ''}`}
                                                                             data-dep-chip="blocks"
                                                                             data-task-id={task.id || task.key}
                                                                             data-task-key={task.key}
                                                                             aria-label={`Blocks ${blocksIds.length} tasks`}
+                                                                            onMouseEnter={() => handleDependencyHoverEnter(task.key, 'blocks')}
+                                                                            onMouseLeave={() => handleDependencyHoverLeave(task.key, 'blocks')}
                                                                         >
                                                                             BLOCKS {blocksIds.length}
                                                                         </button>
@@ -11259,11 +11314,13 @@
                                                                     {dependsOnIds.length > 0 && (
                                                                         <button
                                                                             type="button"
-                                                                            className={`dependency-count ${isDependsFocusActive ? 'active' : ''}`}
+                                                                            className={`dependency-count ${(isDependsFocusActive || isDependsHoverActive) ? 'active' : ''}`}
                                                                             data-dep-chip="depends-on"
                                                                             data-task-id={task.id || task.key}
                                                                             data-task-key={task.key}
                                                                             aria-label={`Depends on ${dependsOnIds.length} tasks`}
+                                                                            onMouseEnter={() => handleDependencyHoverEnter(task.key, 'depends-on')}
+                                                                            onMouseLeave={() => handleDependencyHoverLeave(task.key, 'depends-on')}
                                                                         >
                                                                             DEPENDS ON {dependsOnIds.length}
                                                                         </button>
@@ -11271,11 +11328,13 @@
                                                                     {dependentIds.length > 0 && (
                                                                         <button
                                                                             type="button"
-                                                                            className={`dependency-count ${isDependentsFocusActive ? 'active' : ''}`}
+                                                                            className={`dependency-count ${(isDependentsFocusActive || isDependentsHoverActive) ? 'active' : ''}`}
                                                                             data-dep-chip="dependents"
                                                                             data-task-id={task.id || task.key}
                                                                             data-task-key={task.key}
                                                                             aria-label={`Dependents ${dependentIds.length} tasks`}
+                                                                            onMouseEnter={() => handleDependencyHoverEnter(task.key, 'dependents')}
+                                                                            onMouseLeave={() => handleDependencyHoverLeave(task.key, 'dependents')}
                                                                         >
                                                                             DEPENDENTS {dependentIds.length}
                                                                         </button>
@@ -11306,17 +11365,38 @@
                                                                         <>
                                                                             <div className="dependency-missing-label">Not loaded</div>
                                                                             {missingLines.map(item => (
-                                                                                <div className="dependency-missing-item" key={`missing-${item.key}`}>
-                                                                                    <span>{item.teamName}</span>
-                                                                                    <span className="dependency-missing-sep">·</span>
-                                                                                    <span>{item.assignee}</span>
-                                                                                    <span className="dependency-missing-sep">·</span>
-                                                                                    <span>{item.summary}</span>
-                                                                                    <span className="dependency-missing-sep">·</span>
-                                                                                    <span>{item.key}</span>
-                                                                                    <span className="dependency-missing-sep">·</span>
-                                                                                    <span className={`dependency-missing-status ${item.isDone ? 'done' : ''}`}>{item.status}</span>
-                                                                                </div>
+                                                                                (jiraUrl ? (
+                                                                                    <a
+                                                                                        className="dependency-missing-item"
+                                                                                        key={`missing-${item.key}`}
+                                                                                        href={`${jiraUrl}/browse/${item.key}`}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        title={`Open ${item.key} in Jira`}
+                                                                                    >
+                                                                                        <span>{item.teamName}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.assignee}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.summary}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.key}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span className={`dependency-missing-status ${item.isDone ? 'done' : ''}`}>{item.status}</span>
+                                                                                    </a>
+                                                                                ) : (
+                                                                                    <div className="dependency-missing-item" key={`missing-${item.key}`}>
+                                                                                        <span>{item.teamName}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.assignee}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.summary}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span>{item.key}</span>
+                                                                                        <span className="dependency-missing-sep">·</span>
+                                                                                        <span className={`dependency-missing-status ${item.isDone ? 'done' : ''}`}>{item.status}</span>
+                                                                                    </div>
+                                                                                ))
                                                                             ))}
                                                                             {dependencyLookupLoading && (
                                                                                 <div className="dependency-missing-item">Loading issue details...</div>
