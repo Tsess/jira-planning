@@ -650,6 +650,43 @@ def parse_groups_config_env():
         return None
 
 
+def normalize_team_catalog(raw):
+    catalog = {}
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            team_id = str(item.get('id') or '').strip()
+            name = str(item.get('name') or '').strip()
+            if not team_id or not name:
+                continue
+            catalog[team_id] = {'id': team_id, 'name': name}
+    elif isinstance(raw, dict):
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                team_id = str(value.get('id') or key or '').strip()
+                name = str(value.get('name') or '').strip()
+            else:
+                team_id = str(key or '').strip()
+                name = str(value or '').strip()
+            if not team_id or not name:
+                continue
+            catalog[team_id] = {'id': team_id, 'name': name}
+    return catalog
+
+
+def normalize_team_catalog_meta(raw):
+    if not isinstance(raw, dict):
+        return {}
+    meta = {}
+    for key in ('updatedAt', 'sprintId', 'sprintName', 'source', 'resolvedAt'):
+        value = raw.get(key)
+        if value is None:
+            continue
+        meta[key] = str(value)
+    return meta
+
+
 def validate_groups_config(payload, allow_empty=False):
     errors = []
     warnings = []
@@ -705,7 +742,9 @@ def validate_groups_config(payload, allow_empty=False):
     normalized = {
         'version': payload.get('version') or GROUPS_CONFIG_VERSION,
         'groups': normalized_groups,
-        'defaultGroupId': default_group_id
+        'defaultGroupId': default_group_id,
+        'teamCatalog': normalize_team_catalog(payload.get('teamCatalog') or {}),
+        'teamCatalogMeta': normalize_team_catalog_meta(payload.get('teamCatalogMeta') or {})
     }
     return normalized, errors, warnings
 
@@ -726,7 +765,9 @@ def build_default_groups_config():
             'name': 'Default',
             'teamIds': team_ids
         }],
-        'defaultGroupId': 'default'
+        'defaultGroupId': 'default',
+        'teamCatalog': {},
+        'teamCatalogMeta': {}
     }
     return config, warnings
 
@@ -2641,6 +2682,90 @@ def get_teams():
 
     except Exception as e:
         return jsonify({'error': 'Failed to fetch teams', 'details': str(e)}), 500
+
+
+@app.route('/api/teams/resolve', methods=['GET'])
+def resolve_team_names():
+    """Resolve team names for a list of team IDs."""
+    try:
+        team_ids_param = request.args.get('teamIds', '').strip()
+        team_ids = normalize_team_ids([t.strip() for t in team_ids_param.split(',') if t.strip()])
+        if not team_ids:
+            return jsonify({'error': 'teamIds is required'}), 400
+
+        auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+        headers = {
+            'Authorization': f'Basic {auth_base64}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        team_field_id = resolve_team_field_id(headers)
+        if not team_field_id:
+            team_field_id = JIRA_TEAM_FALLBACK_FIELD_ID
+
+        base_jql = remove_team_filter_from_jql(JQL_QUERY)
+        quoted = ', '.join(f'"{team_id}"' for team_id in team_ids)
+        jql = add_clause_to_jql(base_jql, f'"Team[Team]" in ({quoted})')
+
+        fields_list = ['summary']
+        if team_field_id and team_field_id not in fields_list:
+            fields_list.append(team_field_id)
+        if JIRA_TEAM_FALLBACK_FIELD_ID not in fields_list:
+            fields_list.append(JIRA_TEAM_FALLBACK_FIELD_ID)
+
+        max_results = 250
+        start_at = 0
+        teams_map = {}
+
+        while True:
+            payload = {
+                'jql': jql,
+                'startAt': start_at,
+                'maxResults': max_results,
+                'fields': fields_list
+            }
+            response = jira_search_request(headers, payload)
+            if response.status_code != 200:
+                return jsonify({'error': 'Failed to resolve teams', 'details': response.text}), response.status_code
+            data = response.json() or {}
+            issues = data.get('issues', []) or []
+            if not issues:
+                break
+
+            for issue in issues:
+                fields = issue.get('fields', {}) or {}
+                raw_team = None
+                if fields.get(JIRA_TEAM_FALLBACK_FIELD_ID) is not None:
+                    raw_team = fields.get(JIRA_TEAM_FALLBACK_FIELD_ID)
+                elif team_field_id and fields.get(team_field_id) is not None:
+                    raw_team = fields.get(team_field_id)
+                if raw_team is None:
+                    continue
+                team_value = build_team_value(raw_team)
+                team_id = team_value.get('id') if isinstance(team_value, dict) else None
+                team_name = extract_team_name(raw_team)
+                if team_id and team_name and team_id in team_ids:
+                    teams_map[team_id] = {'id': team_id, 'name': team_name}
+
+            if len(teams_map) >= len(team_ids):
+                break
+
+            start_at += len(issues)
+            total = data.get('total')
+            if total is not None and start_at >= total:
+                break
+            if len(issues) < max_results:
+                break
+
+        missing = [team_id for team_id in team_ids if team_id not in teams_map]
+        return jsonify({'teams': list(teams_map.values()), 'missing': missing})
+
+    except Exception as e:
+        return jsonify({'error': 'Failed to resolve teams', 'details': str(e)}), 500
 
 
 @app.route('/api/teams/all', methods=['GET'])
