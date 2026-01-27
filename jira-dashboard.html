@@ -6615,23 +6615,39 @@
                 const laneHiddenCounts = new Map();
                 const fallbackStart = scenarioViewStart || new Date(0);
                 const DAY_MS = 24 * 60 * 60 * 1000;
-                const assignRows = (issueList, rowEnds, baseOffset) => {
+                const assignRows = (issueList, rowEnds, baseOffset, rowAssignees) => {
                     issueList.forEach((issue) => {
                         if (!issue?.key) return;
+                        const assignee = issue.assignee || null;
                         const isUnscheduled = !issue.start || !issue.end;
                         const start = parseScenarioDate(issue.start) || fallbackStart;
                         const end = parseScenarioDate(issue.end) || start;
                         const normalizedEnd = end < start
                             ? start
                             : (isUnscheduled ? new Date(start.getTime() + DAY_MS) : end);
-                        let rowIndex = rowEnds.findIndex(rowEnd => (
-                            isUnscheduled ? start > rowEnd : start >= rowEnd
-                        ));
+
+                        // Find a row where:
+                        // 1. Time is available (start >= rowEnd)
+                        // 2. Row either has no assignee yet, OR has the same assignee
+                        let rowIndex = rowEnds.findIndex((rowEnd, idx) => {
+                            const timeAvailable = isUnscheduled ? start > rowEnd : start >= rowEnd;
+                            const rowAssignee = rowAssignees[idx];
+                            const assigneeMatch = !rowAssignee || rowAssignee === assignee;
+                            return timeAvailable && assigneeMatch;
+                        });
+
                         if (rowIndex === -1) {
+                            // No suitable row found, create new one
                             rowIndex = rowEnds.length;
                             rowEnds.push(normalizedEnd);
+                            rowAssignees[rowIndex] = assignee;
                         } else {
+                            // Update existing row
                             rowEnds[rowIndex] = normalizedEnd;
+                            // Keep the assignee if row already had one, or set it if it was empty
+                            if (!rowAssignees[rowIndex]) {
+                                rowAssignees[rowIndex] = assignee;
+                            }
                         }
                         rowIndexByKey.set(issue.key, baseOffset + rowIndex);
                     });
@@ -6639,6 +6655,7 @@
                 scenarioLanes.forEach((lane) => {
                     const issues = scenarioIssuesByLane.get(lane) || [];
                     const rowEnds = [];
+                    const rowAssignees = []; // Track which assignee is on each row
                     const capacitySize = scenarioLaneMode === 'team'
                         ? Number(scenarioCapacityByTeam[lane || '']?.size)
                         : null;
@@ -6655,9 +6672,10 @@
                             regularIssues.push(issue);
                         }
                     });
-                    assignRows(regularIssues, rowEnds, 0);
+                    assignRows(regularIssues, rowEnds, 0, rowAssignees);
                     const excludedRowEnds = [];
-                    assignRows(excludedIssues, excludedRowEnds, rowEnds.length);
+                    const excludedRowAssignees = [];
+                    assignRows(excludedIssues, excludedRowEnds, rowEnds.length, excludedRowAssignees);
                     const totalRows = Math.max(1, rowEnds.length + excludedRowEnds.length, capacityRows || 0);
                     const isCollapsed = scenarioEpicFocus ? false : Boolean(scenarioCollapsedLanes[lane]);
                     const collapsedRows = scenarioLaneMode === 'epic'
