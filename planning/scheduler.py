@@ -109,8 +109,10 @@ def schedule_issues(
                 end_date=None,
                 blocked_by=dependencies.get(issue.key, []),
                 scheduled_reason="missing_story_points",
+                assignee=issue.assignee,
             )
 
+    # Handle completed tasks
     for issue in issues:
         status = (issue.status or "").lower()
         if status in ("done", "killed"):
@@ -123,7 +125,54 @@ def schedule_issues(
                 blocked_by=dependencies.get(issue.key, []),
                 scheduled_reason="already_done",
                 duration_weeks=0.0,
+                assignee=issue.assignee,
             )
+
+    # Handle in-progress tasks (schedule before "to do")
+    for issue in issues:
+        if issue.key in scheduled or issue.key in unschedulable:
+            continue
+        status = (issue.status or "").lower()
+        if status in ("in progress", "in review", "in dev"):
+            lane = issue.team or "Unassigned"
+            if config.lane_mode == "assignee":
+                lane = issue.assignee or issue.team or "Unassigned"
+
+            lane_capacity = capacities[lane]
+
+            # Compute duration assuming 50% done
+            duration_weeks = compute_duration_weeks(
+                issue.story_points,
+                config.sp_to_weeks,
+                lane_capacity.capacity_factor,
+            )
+            if duration_weeks is None:
+                continue
+
+            # Assume task started 50% duration ago
+            elapsed_weeks = duration_weeks * 0.5
+            start_week = -elapsed_weeks  # Started in the past
+            end_week = duration_weeks * 0.5  # Remaining time
+
+            start_date = config.start_date + timedelta(weeks=start_week)
+            end_date = config.start_date + timedelta(weeks=end_week)
+
+            scheduled[issue.key] = ScheduledIssue(
+                key=issue.key,
+                summary=issue.summary,
+                lane=lane,
+                start_date=start_date,
+                end_date=end_date,
+                blocked_by=dependencies.get(issue.key, []),
+                scheduled_reason="in_progress",
+                duration_weeks=duration_weeks,
+                assignee=issue.assignee,
+                progress_pct=0.5,
+            )
+
+            # Mark assignee/slot as occupied until end_date
+            if issue.assignee:
+                lane_capacity.assignee_available_at[issue.assignee] = end_week
 
     dependency_keys = {
         key: [dep for dep in deps if dep in issue_map]
@@ -148,6 +197,7 @@ def schedule_issues(
                 end_date=None,
                 blocked_by=dependencies.get(issue.key, []),
                 scheduled_reason="missing_dependency",
+                assignee=issue.assignee,
             )
             continue
 
@@ -175,14 +225,38 @@ def schedule_issues(
                 end_date=None,
                 blocked_by=dependencies.get(issue.key, []),
                 scheduled_reason="missing_story_points",
+                assignee=issue.assignee,
             )
             continue
 
-        slot_index = min(range(len(lane_capacity.available_at)), key=lambda i: lane_capacity.available_at[i])
-        slot_ready = lane_capacity.available_at[slot_index]
-        start_week = max(dep_end, slot_ready)
-        end_week = start_week + duration_weeks
-        lane_capacity.available_at[slot_index] = end_week
+        # Check if issue has assignee and handle per-assignee capacity
+        issue_assignee = issue.assignee
+        if issue_assignee:
+            # Check if assignee already has a task
+            if issue_assignee in lane_capacity.assignee_available_at:
+                # Assignee is busy, wait for them to finish
+                assignee_ready = lane_capacity.assignee_available_at[issue_assignee]
+                start_week = max(dep_end, assignee_ready)
+            else:
+                # Assignee is free, find an available slot
+                slot_index = min(range(len(lane_capacity.available_at)), key=lambda i: lane_capacity.available_at[i])
+                slot_ready = lane_capacity.available_at[slot_index]
+                start_week = max(dep_end, slot_ready)
+                # Assign this slot to the assignee
+                lane_capacity.assignee_slots[issue_assignee] = slot_index
+                # Mark slot as occupied
+                lane_capacity.available_at[slot_index] = start_week + duration_weeks
+
+            # Update assignee availability
+            end_week = start_week + duration_weeks
+            lane_capacity.assignee_available_at[issue_assignee] = end_week
+        else:
+            # Unassigned task: use any available slot
+            slot_index = min(range(len(lane_capacity.available_at)), key=lambda i: lane_capacity.available_at[i])
+            slot_ready = lane_capacity.available_at[slot_index]
+            start_week = max(dep_end, slot_ready)
+            end_week = start_week + duration_weeks
+            lane_capacity.available_at[slot_index] = end_week
 
         start_date = config.start_date + timedelta(weeks=start_week)
         end_date = config.start_date + timedelta(weeks=end_week)
@@ -195,6 +269,7 @@ def schedule_issues(
             blocked_by=dependencies.get(issue.key, []),
             scheduled_reason="scheduled",
             duration_weeks=duration_weeks,
+            assignee=issue.assignee,
         )
 
     all_results = {**scheduled, **unschedulable}

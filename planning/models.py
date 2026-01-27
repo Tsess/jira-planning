@@ -48,6 +48,8 @@ class ScheduledIssue:
     slack_weeks: Optional[float] = None
     is_critical: bool = False
     is_late: bool = False
+    assignee: Optional[str] = None
+    progress_pct: Optional[float] = None
 
 
 @dataclass

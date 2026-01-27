@@ -8,6 +8,8 @@ class LaneCapacity:
     slot_count: int
     capacity_factor: float
     available_at: List[float] = field(default_factory=list)
+    assignee_slots: Dict[str, int] = field(default_factory=dict)  # assignee -> slot_index
+    assignee_available_at: Dict[str, float] = field(default_factory=dict)  # assignee -> end_week
 
 
 def build_lane_capacities(

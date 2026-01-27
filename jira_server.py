@@ -2163,6 +2163,7 @@ def scenario_planner():
                 'scheduledReason': item.scheduled_reason if item else 'context_only',
                 'durationWeeks': item.duration_weeks if item else None,
                 'slackWeeks': item.slack_weeks if item else None,
+                'progressPct': item.progress_pct if item and item.progress_pct is not None else None,
                 'isCritical': item.is_critical if item else False,
                 'isLate': item.is_late if item else False,
                 'isContext': key in context_keys,
