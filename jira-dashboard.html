@@ -4079,6 +4079,9 @@
             const [selectedTeams, setSelectedTeams] = useState(
                 normalizeSelectedTeams(savedPrefsRef.current.selectedTeams ?? savedPrefsRef.current.selectedTeam ?? 'all')
             );
+            const [selectedAssignee, setSelectedAssignee] = useState(savedPrefsRef.current.selectedAssignee ?? 'all');
+            const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+            const assigneeDropdownRef = useRef(null);
             const [epicDetails, setEpicDetails] = useState({});
             const [planningOffset, setPlanningOffset] = useState(0);
             const planningPanelRef = useRef(null);
@@ -5294,6 +5297,17 @@
 
             useEffect(() => {
                 const handleClickOutside = (event) => {
+                    if (!assigneeDropdownRef.current) return;
+                    if (!assigneeDropdownRef.current.contains(event.target)) {
+                        setShowAssigneeDropdown(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
                     if (!sprintDropdownRef.current) return;
                     if (!sprintDropdownRef.current.contains(event.target)) {
                         setShowSprintDropdown(false);
@@ -5346,6 +5360,7 @@
                 saveUiPrefs({
                     selectedSprint,
                     selectedTeams,
+                    selectedAssignee,
                     showPlanning,
                     showStats,
                     showScenario,
@@ -5370,6 +5385,7 @@
             }, [
                 selectedSprint,
                 selectedTeams,
+                selectedAssignee,
                 showPlanning,
                 showStats,
                 showScenario,
@@ -5716,7 +5732,13 @@
                     const sortedTasks = (data.issues || []).sort((a, b) => {
                         const priorityA = priorityOrder[a.fields.priority?.name] || 999;
                         const priorityB = priorityOrder[b.fields.priority?.name] || 999;
-                        return priorityA - priorityB;
+                        if (priorityA !== priorityB) {
+                            return priorityA - priorityB;
+                        }
+                        // Secondary sort by assignee
+                        const assigneeA = a.fields.assignee?.displayName || a.fields.assignee?.name || 'Unassigned';
+                        const assigneeB = b.fields.assignee?.displayName || b.fields.assignee?.name || 'Unassigned';
+                        return assigneeA.localeCompare(assigneeB);
                     });
 
                     const filteredTasks = filterTasksForActiveGroup(sortedTasks);
@@ -6256,6 +6278,27 @@
                 && String(firstFutureSprintId) === String(selectedSprint);
             const selectedTeamSet = React.useMemo(() => new Set(selectedTeams.filter(id => id !== 'all')), [selectedTeams]);
             const isAllTeamsSelected = selectedTeams.includes('all') || selectedTeamSet.size === 0;
+
+            const assigneeOptionsSet = React.useMemo(() => {
+                const assigneeSet = new Set();
+                // Build assignee list from tasks filtered by team only
+                tasks.forEach(task => {
+                    // Apply team filter
+                    if (!isAllTeamsSelected) {
+                        const teamInfo = getTeamInfo(task);
+                        if (!selectedTeamSet.has(teamInfo.id)) {
+                            return;
+                        }
+                    }
+                    const assignee = task.fields.assignee?.displayName || task.fields.assignee?.name || 'Unassigned';
+                    assigneeSet.add(assignee);
+                });
+                return Array.from(assigneeSet).sort((a, b) => {
+                    if (a === 'Unassigned') return 1;
+                    if (b === 'Unassigned') return -1;
+                    return a.localeCompare(b);
+                });
+            }, [tasks, isAllTeamsSelected, selectedTeamSet]);
 
             useEffect(() => {
                 if (!activeGroupId) return;
@@ -7753,6 +7796,14 @@
                         }
                     }
 
+                    // Filter by Assignee
+                    if (selectedAssignee && selectedAssignee !== 'all') {
+                        const taskAssignee = task.fields.assignee?.displayName || task.fields.assignee?.name || 'Unassigned';
+                        if (taskAssignee !== selectedAssignee) {
+                            return false;
+                        }
+                    }
+
                     // Filter by Killed status
                     if (!showKilled && task.fields.status?.name === 'Killed') {
                         return false;
@@ -7779,6 +7830,7 @@
                 epicDetails,
                 isAllTeamsSelected,
                 selectedTeamSet,
+                selectedAssignee,
                 showKilled,
                 showDone,
                 showTech,
@@ -9455,6 +9507,55 @@
                                                         onChange={() => toggleTeamSelection(team.id)}
                                                     />
                                                     <span>{team.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <label>Assignee:</label>
+                                <div className="team-dropdown" ref={assigneeDropdownRef}>
+                                    <div
+                                        className={`team-dropdown-toggle ${showAssigneeDropdown ? 'open' : ''}`}
+                                        role="button"
+                                        tabIndex={tasks.length === 0 && loading ? -1 : 0}
+                                        onClick={() => {
+                                            if (tasks.length === 0 && loading) return;
+                                            setShowAssigneeDropdown(!showAssigneeDropdown);
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (tasks.length === 0 && loading) return;
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                setShowAssigneeDropdown(!showAssigneeDropdown);
+                                            }
+                                        }}
+                                        aria-disabled={tasks.length === 0 && loading}
+                                    >
+                                        <span>{selectedAssignee === 'all' ? 'All Assignees' : selectedAssignee}</span>
+                                        <svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                                            <path d="M6 9L1 4h10z"/>
+                                        </svg>
+                                    </div>
+                                    {showAssigneeDropdown && (
+                                        <div className="team-dropdown-panel">
+                                            <label className="team-dropdown-option">
+                                                <input
+                                                    type="radio"
+                                                    name="assignee"
+                                                    checked={selectedAssignee === 'all'}
+                                                    onChange={() => setSelectedAssignee('all')}
+                                                />
+                                                <span>All Assignees</span>
+                                            </label>
+                                            {assigneeOptionsSet.map(assignee => (
+                                                <label key={assignee} className="team-dropdown-option">
+                                                    <input
+                                                        type="radio"
+                                                        name="assignee"
+                                                        checked={selectedAssignee === assignee}
+                                                        onChange={() => setSelectedAssignee(assignee)}
+                                                    />
+                                                    <span>{assignee}</span>
                                                 </label>
                                             ))}
                                         </div>
