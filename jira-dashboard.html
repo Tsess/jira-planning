@@ -6,6 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="version" content="1.0.1-copy-tasks">
     <title>Jira Execution Planner</title>
     <link rel="icon" href="favicon.ico">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -3026,6 +3027,178 @@
             color: rgba(255, 255, 255, 0.7);
         }
 
+        /* Copy Tasks Panel */
+        .copy-tasks-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .copy-tasks-panel.open {
+            display: block;
+        }
+
+        .copy-header {
+            margin-bottom: 1rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .copy-header h2 {
+            font-size: 1.3rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .copy-stats {
+            display: flex;
+            gap: 1.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .copy-stats span {
+            display: inline-block;
+        }
+
+        .copy-controls {
+            margin-bottom: 1rem;
+            padding: 0.8rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+
+        .copy-controls label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .copy-controls input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .copy-tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .copy-task-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .copy-task-card:hover {
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .copy-task-card.copied {
+            opacity: 0.7;
+            background: #f0f5f0;
+        }
+
+        .copy-task-card .task-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .copy-task-card .task-key {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .copy-task-card .task-key:hover {
+            text-decoration: underline;
+        }
+
+        .copy-task-card .task-status {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .copy-task-card .task-summary {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .copy-task-card .task-assignee {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.8rem;
+        }
+
+        .copy-task-card .task-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .copy-button {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-button:hover:not(:disabled) {
+            background: #b8300a;
+            transform: translateY(-1px);
+        }
+
+        .copy-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .copied-badge {
+            font-size: 0.85rem;
+            color: var(--good);
+            font-weight: 500;
+        }
+
+        .copied-badge a {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .copied-badge a:hover {
+            text-decoration: underline;
+        }
+
+        .copy-loading,
+        .copy-empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
         .stats-controls {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -3987,6 +4160,176 @@
 	            }
 	        }
 
+        // CopyTasksPanel Component - defined outside App to prevent re-creation on every render
+        function CopyTasksPanel({ selectedSprint, jiraUrl }) {
+            const [copyTasks, setCopyTasks] = useState([]);
+            const [copyStatus, setCopyStatus] = useState({});
+            const [hideCopied, setHideCopied] = useState(true);
+            const [loading, setLoading] = useState(false);
+            const [copying, setCopying] = useState(null);
+
+            const DS_TEAM_ID = '78894f38-30f1-46fd-94de-dd05f0cbc50b';
+
+            // Fetch tasks for R&D Data Science team
+            useEffect(() => {
+                if (!selectedSprint) return;
+
+                async function fetchCopyTasks() {
+                    setLoading(true);
+                    try {
+                        const teamParam = encodeURIComponent(`"${DS_TEAM_ID}"`);
+                        const response = await fetch(
+                            `${BACKEND_URL}/api/tasks?sprint=${selectedSprint}&team=${teamParam}`
+                        );
+                        const data = await response.json();
+
+                        if (data.error) {
+                            console.error('Error fetching tasks:', data.error);
+                            setCopyTasks([]);
+                            return;
+                        }
+
+                        const tasks = data.issues || [];
+                        setCopyTasks(tasks);
+
+                        // Fetch copy status for all tasks
+                        if (tasks.length > 0) {
+                            const keys = tasks.map(t => t.key).join(',');
+                            const statusResponse = await fetch(
+                                `${BACKEND_URL}/api/copy-status?keys=${keys}`
+                            );
+                            const statusData = await statusResponse.json();
+                            setCopyStatus(statusData.status || {});
+                        }
+                    } catch (error) {
+                        console.error('Error fetching copy tasks:', error);
+                        setCopyTasks([]);
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+
+                fetchCopyTasks();
+            }, [selectedSprint]);
+
+            async function handleCopyTask(taskKey) {
+                setCopying(taskKey);
+                try {
+                    const response = await fetch(`${BACKEND_URL}/api/copy-task`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sourceKey: taskKey,
+                            targetProject: 'TI_DS'
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        setCopyStatus(prev => ({
+                            ...prev,
+                            [taskKey]: {
+                                copied: true,
+                                targetKey: result.targetKey
+                            }
+                        }));
+                        // Success feedback is shown in UI (badge replaces button)
+                    } else {
+                        alert(`Error: ${result.error}`);
+                    }
+                } catch (error) {
+                    alert(`Error copying task: ${error.message}`);
+                } finally {
+                    setCopying(null);
+                }
+            }
+
+            const filteredTasks = copyTasks.filter(task => {
+                const status = copyStatus[task.key];
+                if (hideCopied && status?.copied) return false;
+                return true;
+            });
+
+            const copiedCount = Object.values(copyStatus).filter(s => s?.copied).length;
+
+            return (
+                <div className="copy-tasks-panel open">
+                    <div className="copy-header">
+                        <h2>Copy Tasks: R&D Data Science → TI_DS</h2>
+                        <div className="copy-stats">
+                            <span>Total: {copyTasks.length}</span>
+                            <span>Copied: {copiedCount}</span>
+                            <span>Remaining: {copyTasks.length - copiedCount}</span>
+                        </div>
+                    </div>
+
+                    <div className="copy-controls">
+                        <label>
+                            <input
+                                type="checkbox"
+                                checked={hideCopied}
+                                onChange={e => setHideCopied(e.target.checked)}
+                            />
+                            Hide already copied tasks
+                        </label>
+                    </div>
+
+                    {loading ? (
+                        <div className="copy-loading">Loading tasks...</div>
+                    ) : (
+                        <div className="copy-tasks-list">
+                            {filteredTasks.length === 0 ? (
+                                <div className="copy-empty">
+                                    {copyTasks.length === 0 ? 'No tasks found for R&D Data Science team' : 'All tasks have been copied'}
+                                </div>
+                            ) : (
+                                filteredTasks.map(task => {
+                                    const status = copyStatus[task.key];
+                                    const isCopied = status?.copied || false;
+                                    const targetKey = status?.targetKey;
+                                    const isCopying = copying === task.key;
+
+                                    return (
+                                        <div key={task.key} className={`copy-task-card ${isCopied ? 'copied' : ''}`}>
+                                            <div className="task-header">
+                                                <a href={`${jiraUrl}/browse/${task.key}`} target="_blank" rel="noopener noreferrer" className="task-key">
+                                                    {task.key}
+                                                </a>
+                                                <span className="task-status">{task.fields?.status?.name || 'Unknown'}</span>
+                                            </div>
+
+                                            <div className="task-summary">{task.fields?.summary || 'No summary'}</div>
+
+                                            {task.fields?.assignee?.displayName && (
+                                                <div className="task-assignee">👤 {task.fields.assignee.displayName}</div>
+                                            )}
+
+                                            <div className="task-actions">
+                                                {isCopied ? (
+                                                    <span className="copied-badge">
+                                                        ✓ Copied to <a href={`${jiraUrl}/browse/${targetKey}`} target="_blank" rel="noopener noreferrer">{targetKey}</a>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        className="copy-button"
+                                                        onClick={() => handleCopyTask(task.key)}
+                                                        disabled={isCopying}
+                                                    >
+                                                        {isCopying ? 'Copying...' : '📋 Copy to TI_DS'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function App() {
             const savedPrefsRef = useRef(loadUiPrefs() || {});
             const perfEnabled = React.useMemo(
@@ -4064,6 +4407,7 @@
             const [showPlanning, setShowPlanning] = useState(savedPrefsRef.current.showPlanning ?? false);
             const [showStats, setShowStats] = useState(savedPrefsRef.current.showStats ?? false);
             const [showScenario, setShowScenario] = useState(savedPrefsRef.current.showScenario ?? false);
+            const [showCopyTasks, setShowCopyTasks] = useState(savedPrefsRef.current.showCopyTasks ?? false);
             const [showDependencies, setShowDependencies] = useState(savedPrefsRef.current.showDependencies ?? false);
             const [searchQuery, setSearchQuery] = useState(savedPrefsRef.current.searchQuery ?? '');
             const [searchInput, setSearchInput] = useState(savedPrefsRef.current.searchQuery ?? '');
@@ -5231,6 +5575,7 @@
                 if (showStats) {
                     setShowPlanning(false);
                     setShowScenario(false);
+                    setShowCopyTasks(false);
                 }
             }, [showStats]);
 
@@ -5238,8 +5583,17 @@
                 if (showScenario) {
                     setShowPlanning(false);
                     setShowStats(false);
+                    setShowCopyTasks(false);
                 }
             }, [showScenario]);
+
+            useEffect(() => {
+                if (showCopyTasks) {
+                    setShowPlanning(false);
+                    setShowStats(false);
+                    setShowScenario(false);
+                }
+            }, [showCopyTasks]);
 
             useEffect(() => {
                 if (isCompletedSprintSelected && showScenario) {
@@ -9595,6 +9949,17 @@
                                             <path d="M6 9L1 4h10z"/>
                                         </svg>
                                     </button>
+                                    <button
+                                        className={`planning-button ${showCopyTasks ? 'active' : ''}`}
+                                        onClick={() => setShowCopyTasks(!showCopyTasks)}
+                                        title="Copy tasks to TI_DS"
+                                        disabled={!selectedSprint}
+                                    >
+                                        Copy Tasks
+                                        <svg viewBox="0 0 12 12" fill="currentColor">
+                                            <path d="M6 9L1 4h10z"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -10929,6 +11294,8 @@
                             </div>
                         </div>
                     )}
+
+                    {showCopyTasks && <CopyTasksPanel selectedSprint={selectedSprint} jiraUrl={jiraUrl} />}
 
 	                    <div ref={planningPanelRef} className={`planning-panel ${showPlanning && !isCompletedSprintSelected ? 'open' : ''}`}>
 	                        <div className="planning-stats">

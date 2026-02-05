@@ -3298,6 +3298,206 @@ def health_check():
     })
 
 
+def fetch_issue_by_key(issue_key):
+    """Fetch single issue by key with required fields."""
+    auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+    auth_bytes = auth_string.encode('ascii')
+    auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+    headers = {
+        'Authorization': f'Basic {auth_base64}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    url = f'{JIRA_URL}/rest/api/3/issue/{issue_key}'
+    params = {
+        'fields': 'summary,description,issuetype,assignee'
+    }
+    response = HTTP_SESSION.get(url, params=params, headers=headers, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def create_issue_in_ti_ds(source_issue, target_project):
+    """Create new issue in target project with status 'New'."""
+    auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+    auth_bytes = auth_string.encode('ascii')
+    auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+    headers = {
+        'Authorization': f'Basic {auth_base64}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    fields = source_issue['fields']
+
+    # Map issue types to TI_DS available types
+    # TI_DS doesn't have "Story" or "Bug" types, map everything to "Task" (id: 3)
+    source_type = fields.get('issuetype', {}).get('name', 'Task')
+    target_type_id = '3'  # Task is the universal type in TI_DS
+
+    # Only use Sub-task if source is Sub-task and target supports it
+    if source_type == 'Sub-task':
+        target_type_id = '5'  # Sub-task
+    elif source_type == 'Epic':
+        target_type_id = '6'  # Epic
+    # All others (Story, Bug, Task, etc.) → Task (id: 3)
+
+    payload = {
+        "fields": {
+            "project": {"key": target_project},
+            "summary": fields.get('summary', ''),
+            "issuetype": {"id": target_type_id},
+        }
+    }
+
+    # Add description if present
+    if fields.get('description'):
+        payload['fields']['description'] = fields['description']
+
+    # Add assignee if present
+    assignee = fields.get('assignee')
+    if assignee and assignee.get('accountId'):
+        payload['fields']['assignee'] = {"accountId": assignee['accountId']}
+
+    url = f'{JIRA_URL}/rest/api/3/issue'
+    print(f'Creating issue in {target_project}...', flush=True)
+    print(f'Payload: {json.dumps(payload, indent=2)}', flush=True)
+
+    response = HTTP_SESSION.post(url, json=payload, headers=headers, timeout=30)
+
+    if response.status_code != 201:
+        print(f'❌ Error creating issue: {response.status_code}', flush=True)
+        print(f'Response: {response.text}', flush=True)
+        response.raise_for_status()
+
+    return response.json()
+
+
+def create_duplicate_link(source_key, target_key):
+    """Create Duplicate link between source and target issues."""
+    auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+    auth_bytes = auth_string.encode('ascii')
+    auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+    headers = {
+        'Authorization': f'Basic {auth_base64}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        "type": {"name": "Duplicate"},
+        "inwardIssue": {"key": source_key},
+        "outwardIssue": {"key": target_key}
+    }
+
+    url = f'{JIRA_URL}/rest/api/3/issueLink'
+    response = HTTP_SESSION.post(url, json=payload, headers=headers, timeout=30)
+    response.raise_for_status()
+
+
+def check_duplicate_link(issue_key):
+    """Check if issue has Duplicate link to TI_DS project."""
+    auth_string = f"{JIRA_EMAIL}:{JIRA_TOKEN}"
+    auth_bytes = auth_string.encode('ascii')
+    auth_base64 = base64.b64encode(auth_bytes).decode('ascii')
+
+    headers = {
+        'Authorization': f'Basic {auth_base64}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    url = f'{JIRA_URL}/rest/api/3/issue/{issue_key}'
+    params = {'fields': 'issuelinks'}
+
+    response = HTTP_SESSION.get(url, params=params, headers=headers, timeout=30)
+    if response.status_code != 200:
+        return {'copied': False, 'targetKey': None}
+
+    data = response.json()
+    links = data.get('fields', {}).get('issuelinks', [])
+
+    # Find outward Duplicate link in TI_DS
+    for link in links:
+        if link.get('type', {}).get('name') == 'Duplicate':
+            outward = link.get('outwardIssue')
+            if outward and outward.get('key', '').startswith('TI_DS-'):
+                return {
+                    'copied': True,
+                    'targetKey': outward['key']
+                }
+
+    return {'copied': False, 'targetKey': None}
+
+
+@app.route('/api/copy-task', methods=['POST'])
+def copy_task():
+    """Copy a single task from source to TI_DS project."""
+    try:
+        data = request.get_json()
+        source_key = data.get('sourceKey')
+        target_project = data.get('targetProject', 'TI_DS')
+
+        if not source_key:
+            return jsonify({
+                'success': False,
+                'error': 'sourceKey is required'
+            }), 400
+
+        print(f'📋 Copying {source_key} to {target_project}...')
+
+        # 1. Fetch original issue
+        source_issue = fetch_issue_by_key(source_key)
+
+        # 2. Create new issue in TI_DS with status "New"
+        new_issue = create_issue_in_ti_ds(source_issue, target_project)
+
+        # 3. Create Duplicate link
+        create_duplicate_link(source_key, new_issue['key'])
+
+        print(f'✅ Copied {source_key} to {new_issue["key"]}')
+
+        return jsonify({
+            'success': True,
+            'sourceKey': source_key,
+            'targetKey': new_issue['key'],
+            'message': f'Copied to {new_issue["key"]}'
+        })
+    except Exception as e:
+        print(f'❌ Error copying {source_key}: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/copy-status', methods=['GET'])
+def get_copy_status():
+    """Check copy status for multiple issues via Duplicate links."""
+    source_keys = request.args.get('keys', '').split(',')
+    source_keys = [k.strip() for k in source_keys if k.strip()]
+
+    if not source_keys:
+        return jsonify({'status': {}})
+
+    status_map = {}
+    for key in source_keys:
+        try:
+            duplicate_info = check_duplicate_link(key)
+            status_map[key] = duplicate_info
+        except Exception as e:
+            print(f'⚠️ Error checking {key}: {str(e)}')
+            status_map[key] = {'copied': False, 'targetKey': None}
+
+    return jsonify({'status': status_map})
+
+
 @app.route('/api/test', methods=['GET'])
 def test_connection():
     """Test Jira connection with simple query"""

@@ -20,8 +20,9 @@ Simple local dashboard to display Jira sprint tasks sorted by priority with Pyth
 - ✅ **Planning rollups** - Selected story points summarized per team, project, and overall
 - ✅ **Capacity planning** - Team capacity vs planning capacity (exclusions via epic toggle)
 - ✅ **Scenario planner** - Timeline scheduling with capacity, WIP limits, dependencies, critical path, and slack
-- ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and “Epic Ready to Close” (rules: `ALERT_RULES.md`, ready-to-close uses all-time data)
+- ✅ **Alerts** - Panels for Missing Story Points, Blocked, Missing Epic, Empty Epic, and "Epic Ready to Close" (rules: `ALERT_RULES.md`, ready-to-close uses all-time data)
 - ✅ **Sprint statistics** - Teams/Priority views with product/tech split, derived from loaded sprint tasks (with epic include/exclude toggle)
+- ✅ **Copy Tasks** - Copy tasks from R&D Data Science team to TI_DS project with Duplicate link tracking
 
 ## 📋 Files
 
@@ -179,6 +180,8 @@ You should see:
    • http://localhost:<PORT>/api/config - Get public configuration
    • http://localhost:<PORT>/api/test - Test connection
    • http://localhost:<PORT>/api/tasks-fields?limit=5 - Get issues with all fields for JQL_QUERY
+   • http://localhost:<PORT>/api/copy-task - Copy task to TI_DS project (POST)
+   • http://localhost:<PORT>/api/copy-status?keys=KEY-1,KEY-2 - Check copy status via Duplicate links (GET)
    • http://localhost:<PORT>/health - Health check
 
 ✅ Server ready! Open jira-dashboard.html in your browser
@@ -284,6 +287,30 @@ Scenario API response (used by the UI):
 - `capacity_by_team`: `{ teamName: { size, capacityIssueKey, watchersCount } }`
 - `focus_set`: `focused_issue_keys`, `context_issue_keys`
 - `summary`: `critical_path`, `bottleneck_lanes`, `late_items`, `unschedulable`, `deadline_met`
+
+## 📋 Copy Tasks
+
+The Copy Tasks panel enables one-by-one task copying from R&D Data Science team to TI_DS project:
+
+- **Target team**: R&D Data Science (UUID: `78894f38-30f1-46fd-94de-dd05f0cbc50b`)
+- **Target project**: TI_DS (https://criteo.atlassian.net/jira/software/c/projects/TI_DS)
+- **Tracking**: Uses Duplicate links in Jira (new task "duplicates" original)
+- **Copied fields**: Summary, Description (ADF format), Issue Type, Assignee
+- **Not copied**: Story Points, Priority, Epic Links, Dependencies, Team field
+- **Type mapping**: Story/Bug → Task (id: 3), Sub-task → Sub-task (id: 5), Epic → Epic (id: 6)
+- **Status**: All copied tasks are created with status "New"
+
+**Workflow:**
+1. Open "Copy Tasks" tab in the dashboard
+2. Select sprint (e.g., 2026Q1)
+3. Review list of R&D Data Science tasks
+4. Click "📋 Copy to TI_DS" for each task you want to copy
+5. Button changes to "✓ Copied to TI_DS-XXX" with link to new task
+6. Use "Hide already copied tasks" checkbox to show only uncopied tasks
+
+**API endpoints:**
+- `POST /api/copy-task` - Copy single task with `{sourceKey, targetProject}`
+- `GET /api/copy-status?keys=KEY-1,KEY-2` - Check copy status via Duplicate links
 
 ## 🔒 Security Notes
 
